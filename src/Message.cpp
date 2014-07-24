@@ -15,7 +15,7 @@ std::shared_ptr<Message> Message::reconstruct(std::shared_ptr<Socket> socket)
 
 //******************************************************************************
 
-Message::Message(const MessageType& messageType) :
+Message::Message(MessageType messageType) :
    m_messageType(messageType)
 {
    Logger::logInstanceCreate("Message");
@@ -24,6 +24,7 @@ Message::Message(const MessageType& messageType) :
 //******************************************************************************
 
 Message::Message(const Message& copy) :
+   m_serviceName(copy.m_serviceName),
    m_textPayload(copy.m_textPayload),
    m_kvpPayload(copy.m_kvpPayload),
    m_messageType(copy.m_messageType)
@@ -34,6 +35,7 @@ Message::Message(const Message& copy) :
 //******************************************************************************
 
 Message::Message(Message&& move) :
+   m_serviceName(std::move(move.m_serviceName)),
    m_textPayload(std::move(move.m_textPayload)),
    m_kvpPayload(std::move(move.m_kvpPayload)),
    m_messageType(move.m_messageType)
@@ -56,6 +58,7 @@ Message& Message::operator=(const Message& copy)
       return *this;
    }
    
+   m_serviceName = copy.m_serviceName;
    m_textPayload = copy.m_textPayload;
    m_kvpPayload = copy.m_kvpPayload;
    m_messageType = copy.m_messageType;
@@ -71,11 +74,26 @@ Message& Message::operator=(Message&& move)
       return *this;
    }
    
+   m_serviceName = std::move(move.m_serviceName);
    m_textPayload = std::move(move.m_textPayload);
    m_kvpPayload = std::move(move.m_kvpPayload);
    m_messageType = move.m_messageType;
    
    return *this;
+}
+
+//******************************************************************************
+
+bool Message::send(const std::string& serviceName)
+{
+   return false;
+}
+
+//******************************************************************************
+
+bool Message::send(const std::string& serviceName, Message& responseMessage)
+{
+   return false;
 }
 
 //******************************************************************************
@@ -111,6 +129,13 @@ void Message::setKeyValuesPayload(const KeyValuePairs& kvp)
 void Message::setTextPayload(const std::string& text)
 {
    m_textPayload = text;
+}
+
+//******************************************************************************
+
+const std::string& Message::getServiceName() const
+{
+   return m_serviceName;
 }
 
 //******************************************************************************
