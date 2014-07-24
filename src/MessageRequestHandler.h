@@ -14,6 +14,8 @@ public:
    MessageRequestHandler(SocketServer& socketServer, std::shared_ptr<Socket> socket);
    MessageRequestHandler(SocketServer& socketServer, std::shared_ptr<SocketRequest> socketRequest);
    
+   ~MessageRequestHandler();
+   
    virtual void run();
    
 private:

@@ -2,6 +2,7 @@
 #include "MessageHandler.h"
 #include "BasicException.h"
 #include "Message.h"
+#include "Logger.h"
 
 //******************************************************************************
 
@@ -9,6 +10,7 @@ MessageRequestHandler::MessageRequestHandler(SocketServer& socketServer, std::sh
    RequestHandler(socket),
    m_socketServer(socketServer)
 {
+   Logger::logInstanceCreate("MessageRequestHandler");
 }
 
 //******************************************************************************
@@ -17,6 +19,14 @@ MessageRequestHandler::MessageRequestHandler(SocketServer& socketServer, std::sh
    RequestHandler(socketRequest),
    m_socketServer(socketServer)
 {
+   Logger::logInstanceCreate("MessageRequestHandler");
+}
+
+//******************************************************************************
+
+MessageRequestHandler::~MessageRequestHandler()
+{
+   Logger::logInstanceDestroy("MessageRequestHandler");
 }
 
 //******************************************************************************

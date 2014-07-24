@@ -14,6 +14,7 @@ public:
    MessagingServer(const std::string& configFilePath,
                    const std::string& serviceName,
                    MessageHandler* handler);
+   ~MessagingServer();
 
    virtual std::shared_ptr<RequestHandler> handlerForSocket(std::shared_ptr<Socket> socket);
    virtual std::shared_ptr<RequestHandler> handlerForSocketRequest(std::shared_ptr<SocketRequest> socketRequest);

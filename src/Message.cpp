@@ -1,4 +1,5 @@
 #include "Message.h"
+#include "Logger.h"
 
 //******************************************************************************
 
@@ -17,7 +18,7 @@ std::shared_ptr<Message> Message::reconstruct(std::shared_ptr<Socket> socket)
 Message::Message(const MessageType& messageType) :
    m_messageType(messageType)
 {
-   
+   Logger::logInstanceCreate("Message");
 }
 
 //******************************************************************************
@@ -27,6 +28,7 @@ Message::Message(const Message& copy) :
    m_kvpPayload(copy.m_kvpPayload),
    m_messageType(copy.m_messageType)
 {
+   Logger::logInstanceCreate("Message");
 }
 
 //******************************************************************************
@@ -36,14 +38,14 @@ Message::Message(Message&& move) :
    m_kvpPayload(std::move(move.m_kvpPayload)),
    m_messageType(move.m_messageType)
 {
-   
+   Logger::logInstanceCreate("Message");
 }
 
 //******************************************************************************
 
 Message::~Message()
 {
-   
+   Logger::logInstanceDestroy("Message");
 }
 
 //******************************************************************************

@@ -2,6 +2,7 @@
 #include "MessageHandler.h"
 #include "ServerSocket.h"
 #include "MessageRequestHandler.h"
+#include "Logger.h"
 
 //******************************************************************************
 
@@ -12,6 +13,14 @@ MessagingServer::MessagingServer(const std::string& configFilePath,
    m_handler(handler),
    m_serviceName(serverServiceName)
 {
+   Logger::logInstanceCreate("MessagingServer");
+}
+
+//******************************************************************************
+
+MessagingServer::~MessagingServer()
+{
+   Logger::logInstanceDestroy("MessagingServer");
 }
 
 //******************************************************************************
