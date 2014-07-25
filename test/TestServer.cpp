@@ -55,7 +55,7 @@ public:
                                KeyValuePairs& responsePayload)
    {
       if (requestName == "echo") {
-         
+         responsePayload = requestPayload;
       }                               
    }
 };
