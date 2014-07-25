@@ -10,6 +10,9 @@
 #include "StrUtils.h"
 #include "Socket.h"
 
+static const int MAX_STACK_BUFFER_SIZE          = 4096;
+static const int MAX_SEGMENT_LENGTH             = 32767;
+
 static const int NUM_CHARS_HEADER_LENGTH        = 10;
 
 static const std::string DELIMITER_KEY_VALUE    = "=";
@@ -225,23 +228,23 @@ bool Message::reconstitute(std::shared_ptr<Socket> socket)
 {
    if (socket != nullptr) {
       char headerLengthPrefixBuffer[11];
-      memset(headerLengthPrefixBuffer, 0, 11);
+      memset(headerLengthPrefixBuffer, 0, NUM_CHARS_HEADER_LENGTH+1);
       
-      if (socket->read(headerLengthPrefixBuffer, 10)) {
-         headerLengthPrefixBuffer[10] = '\0';
+      if (socket->read(headerLengthPrefixBuffer, NUM_CHARS_HEADER_LENGTH)) {
+         headerLengthPrefixBuffer[NUM_CHARS_HEADER_LENGTH] = '\0';
          
          std::string headerLengthPrefix = headerLengthPrefixBuffer;
          StrUtils::stripTrailing(headerLengthPrefix, ' ');
          const std::size_t headerLength = std::atol(headerLengthPrefix.c_str());
          
          if (headerLength > 0) {
-            char stackBuffer[4096];
+            char stackBuffer[MAX_STACK_BUFFER_SIZE];
             bool stackBufferZeroed = false;
             bool headerRead = false;
             std::string headerAsString;
             
-            if (headerLength <= 4096) {
-               memset(stackBuffer, 0, 4096);
+            if (headerLength < MAX_STACK_BUFFER_SIZE) {
+               memset(stackBuffer, 0, MAX_STACK_BUFFER_SIZE);
                stackBufferZeroed = true;
                
                if (socket->read(stackBuffer, headerLength)) {
@@ -253,9 +256,9 @@ bool Message::reconstitute(std::shared_ptr<Socket> socket)
                   return false;
                }
             } else {
-               if (headerLength <= 32767) {
-                  char* heapBuffer = new char[headerLength];
-                  memset(heapBuffer, 0, headerLength);
+               if (headerLength <= MAX_SEGMENT_LENGTH) {
+                  char* heapBuffer = new char[headerLength+1];
+                  memset(heapBuffer, 0, headerLength+1);
                   if (socket->read(heapBuffer, headerLength)) {
                      heapBuffer[headerLength] = '\0';
                      headerRead = true;
@@ -300,8 +303,8 @@ bool Message::reconstitute(std::shared_ptr<Socket> socket)
                            bool payloadRead = false;
                            std::string payloadAsString;
                            
-                           if (payloadLength <= 4096) {
-                              memset(stackBuffer, 0, 4096);
+                           if (payloadLength < MAX_STACK_BUFFER_SIZE) {
+                              memset(stackBuffer, 0, MAX_STACK_BUFFER_SIZE);
                               
                               if (socket->read(stackBuffer, payloadLength)) {
                                  stackBuffer[payloadLength] = '\0';
@@ -312,7 +315,7 @@ bool Message::reconstitute(std::shared_ptr<Socket> socket)
                                  return false;
                               }
                            } else {
-                              if (payloadLength <= 32767) {
+                              if (payloadLength <= MAX_SEGMENT_LENGTH) {
                                  char* heapBuffer = new char[payloadLength];
                                  memset(heapBuffer, 0, payloadLength);
                                  if (socket->read(heapBuffer, payloadLength)) {
@@ -459,9 +462,9 @@ bool Message::fromString(const std::string& s, KeyValuePairs& kvp)
 
 std::string Message::encodeLength(std::size_t lengthBytes)
 {
-   char lengthAsChars[10];
-   memset(lengthAsChars, 0, 10);
-   snprintf(lengthAsChars, 10, "%lu", lengthBytes);
+   char lengthAsChars[11];
+   memset(lengthAsChars, 0, NUM_CHARS_HEADER_LENGTH+1);
+   snprintf(lengthAsChars, NUM_CHARS_HEADER_LENGTH, "%lu", lengthBytes);
    return std::string(lengthAsChars);
 }
 
@@ -472,9 +475,9 @@ std::size_t Message::decodeLength(std::shared_ptr<Socket> socket)
    std::size_t lengthBytes = 0;
    
    if (socket != nullptr) {
-      char lengthAsChars[10];
-      memset(lengthAsChars, 0, 10);
-      if (socket->read(lengthAsChars, 10)) {
+      char lengthAsChars[11];
+      memset(lengthAsChars, 0, NUM_CHARS_HEADER_LENGTH+1);
+      if (socket->read(lengthAsChars, NUM_CHARS_HEADER_LENGTH)) {
          return std::atol(lengthAsChars);
       }
    }
