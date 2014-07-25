@@ -34,10 +34,10 @@ public:
    static std::string& stripLeading(std::string& s, char strip) noexcept;
    static std::string& trimLeadingSpaces(std::string& s) noexcept;
    
-   static std::string gzipCompress(const std::string& s);
-   static std::string gzipDecompress(const std::string& s);
-   
    static void padRight(std::string& s, char padChar, int paddedLength);
+
+   //static std::string gzipCompress(const std::string& s);
+   //static std::string gzipDecompress(const std::string& s);
    
 };
 

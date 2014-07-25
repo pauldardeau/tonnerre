@@ -226,7 +226,7 @@ std::string& StrUtils::replaceAll(std::string& s,
 }
 
 //******************************************************************************
-
+/*
 std::string StrUtils::gzipCompress(const std::string& str)
 {
    z_stream zs;
@@ -295,9 +295,9 @@ std::string StrUtils::gzipCompress(const std::string& str)
 
    return outstring;
 }
-
+*/
 //******************************************************************************
-
+/*
 std::string StrUtils::gzipDecompress(const std::string& str)
 {
    z_stream zs;                        // z_stream is zlib's control structure
@@ -339,7 +339,7 @@ std::string StrUtils::gzipDecompress(const std::string& str)
    
    return outstring;
 }
-
+*/
 //******************************************************************************
 
 void StrUtils::padRight(std::string& s, char padChar, int paddedLength)
