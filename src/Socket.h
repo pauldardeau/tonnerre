@@ -35,6 +35,8 @@ public:
     
    ssize_t receive(void* receiveBuffer, size_t bufferLength, int flags) noexcept;
    bool read(char* buffer, int bufferLen) noexcept;
+   bool readSocket(char* buffer, int bytesToRead) noexcept;
+   
     
    void close() noexcept;
    bool isOpen() const noexcept;
@@ -76,7 +78,7 @@ public:
    
 protected:
    bool readMsg(int length) noexcept;
-   bool readSocket(char* buffer, int bytesToRead) noexcept;
+   //bool readSocket(char* buffer, int bytesToRead) noexcept;
    bool open() noexcept;
    void init() noexcept;
    
