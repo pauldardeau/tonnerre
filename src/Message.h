@@ -1,3 +1,6 @@
+// Copyright Paul Dardeau, SwampBits LLC 2014
+// BSD License
+
 #ifndef MESSAGE_H
 #define MESSAGE_H
 
@@ -44,11 +47,23 @@ public:
 
    const std::string& getServiceName() const;
    
+   std::string toString() const;
+   
+   static std::string toString(const KeyValuePairs& kvp);
+   static bool fromString(const std::string& s, KeyValuePairs& kvp);
+   
+   static std::string encodeLength(std::size_t lengthBytes);
+   static std::size_t decodeLength(std::shared_ptr<Socket> socket);
+   
+   std::shared_ptr<Socket> socketForService(const std::string& serviceName) const;
+   
 private:
    std::string m_serviceName;
    std::string m_textPayload;
    KeyValuePairs m_kvpPayload;
+   KeyValuePairs m_kvpHeaders;
    MessageType m_messageType;
+   bool m_isOneWay;
    
 };
 
