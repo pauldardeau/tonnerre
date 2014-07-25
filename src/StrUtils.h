@@ -37,6 +37,8 @@ public:
    static std::string gzipCompress(const std::string& s);
    static std::string gzipDecompress(const std::string& s);
    
+   static void padRight(std::string& s, char padChar, int paddedLength);
+   
 };
 
 
