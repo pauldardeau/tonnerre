@@ -345,7 +345,7 @@ std::string StrUtils::gzipDecompress(const std::string& str)
 void StrUtils::padRight(std::string& s, char padChar, int paddedLength)
 {
    if (s.length() < paddedLength) {
-      s.append(std::string(padChar, paddedLength - s.length()));
+      s += std::string(paddedLength - s.length(), padChar);
    }
 }
 
