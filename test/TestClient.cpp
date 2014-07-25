@@ -1,3 +1,6 @@
+// Copyright Paul Dardeau, SwampBits LLC 2014
+// BSD License
+
 #include <string>
 #include <vector>
 #include <cstdio>

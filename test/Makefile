@@ -1,3 +1,6 @@
+# Copyright Paul Dardeau, SwampBits LLC 2014
+# BSD License
+
 CC = clang++
 CC_OPTS = -c -std=c++11 -I../src
 
