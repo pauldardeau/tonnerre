@@ -12,6 +12,9 @@ class SocketServiceHandler;
 class MessagingServer : public SocketServer
 {
 public:
+   static const std::string SERVER_NAME;
+   static const std::string SERVER_VERSION;
+   
    MessagingServer(const std::string& configFilePath,
                    const std::string& serviceName,
                    MessageHandler* handler);

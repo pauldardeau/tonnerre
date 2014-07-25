@@ -5,12 +5,16 @@
 #include "MessageSocketServiceHandler.h"
 #include "Logger.h"
 
+
+const std::string MessagingServer::SERVER_NAME     = "Tonnerre";
+const std::string MessagingServer::SERVER_VERSION  = "0.1";
+
 //******************************************************************************
 
 MessagingServer::MessagingServer(const std::string& configFilePath,
                                  const std::string& serverServiceName,
                                  MessageHandler* handler) :
-   SocketServer(configFilePath),
+   SocketServer(SERVER_NAME, SERVER_VERSION, configFilePath),
    m_handler(handler),
    m_serviceName(serverServiceName)
 {

@@ -38,9 +38,6 @@
 
 
 
-static const std::string SERVER_NAME             = "Misere";
-static const std::string SERVER_VERSION          = "0.1";
-
 static const std::string CFG_TRUE_SETTING_VALUES = "yes|true|1";
 
 static const std::string EMPTY = "";
@@ -123,12 +120,16 @@ static const char* LOG_MONTH_NAME[12] =
 //******************************************************************************
 //******************************************************************************
 
-SocketServer::SocketServer(const std::string& configFilePath) :
+SocketServer::SocketServer(const std::string& serverName,
+                           const std::string& serverVersion,
+                           const std::string& configFilePath) :
    m_kernelEventServer(nullptr),
    m_serverSocket(nullptr),
    m_threadPool(nullptr),
    m_threadingFactory(nullptr),
    m_configFilePath(configFilePath),
+   m_serverName(serverName),
+   m_serverVersion(serverVersion),
    m_isDone(false),
    m_isThreaded(true),
    m_isUsingKernelEventServer(false),
@@ -174,7 +175,7 @@ const std::string& SocketServer::getServerId() const noexcept
 //******************************************************************************
 
 bool SocketServer::hasTrueValue(const KeyValuePairs& kvp,
-                              const std::string& setting) const noexcept
+                                const std::string& setting) const noexcept
 {
    bool hasTrueValue = false;
    
@@ -192,7 +193,7 @@ bool SocketServer::hasTrueValue(const KeyValuePairs& kvp,
 //******************************************************************************
 
 int SocketServer::getIntValue(const KeyValuePairs& kvp,
-                            const std::string& setting) const noexcept
+                              const std::string& setting) const noexcept
 {
    int value = -1;
    
@@ -211,7 +212,7 @@ int SocketServer::getIntValue(const KeyValuePairs& kvp,
 //******************************************************************************
 
 void SocketServer::replaceVariables(const KeyValuePairs& kvp,
-                                  std::string& s) const noexcept
+                                    std::string& s) const noexcept
 {
    if (!s.empty()) {
       std::vector<std::string> keys;
@@ -381,8 +382,8 @@ bool SocketServer::init(int port)
                const auto posDollar = serverString.find("$");
                if (posDollar != std::string::npos) {
                   KeyValuePairs kvpVars;
-                  kvpVars.addPair("$PRODUCT_NAME", SERVER_NAME);
-                  kvpVars.addPair("$PRODUCT_VERSION", SERVER_VERSION);
+                  kvpVars.addPair("$PRODUCT_NAME", m_serverName);
+                  kvpVars.addPair("$PRODUCT_VERSION", m_serverVersion);
                   kvpVars.addPair("$CFG_SOCKETS", m_sockets);
                   kvpVars.addPair("$CFG_THREADING", m_threading);
                   
@@ -499,9 +500,9 @@ bool SocketServer::init(int port)
 
    std::string portAsString = std::to_string(port);
 
-   std::string startupMsg = SERVER_NAME;
+   std::string startupMsg = m_serverName;
    startupMsg += " ";
-   startupMsg += SERVER_VERSION;
+   startupMsg += m_serverVersion;
    startupMsg += " listening on port ";
    startupMsg += portAsString;
    startupMsg += " (request concurrency: ";

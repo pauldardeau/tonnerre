@@ -24,9 +24,13 @@ class SocketServer
    public:
       /**
        * Constructs a SocketServer with the file name/path for a configuration file
+       * @param serverName the name of the server
+       * @param serverVersion the version of the server
        * @param configFilePath the file name/path for configuration settings
        */
-      explicit SocketServer(const std::string& configFilePath);
+      SocketServer(const std::string& serverName,
+                   const std::string& serverVersion,
+                   const std::string& configFilePath);
    
       /**
        * Destructor
@@ -183,6 +187,8 @@ class SocketServer
       std::string m_serverString;
       std::string m_threading;
       std::string m_sockets;
+      std::string m_serverName;
+      std::string m_serverVersion;
       bool m_isDone;
       bool m_isThreaded;
       bool m_isUsingKernelEventServer;
