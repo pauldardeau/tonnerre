@@ -96,21 +96,21 @@ std::shared_ptr<Thread> ThreadPool::createThreadWithRunnable(std::shared_ptr<Run
 
 int ThreadPool::getNumberWorkers() const noexcept
 {
-	return m_workerCount;
+   return m_workerCount;
 }
 
 //******************************************************************************
 
 void ThreadPool::addWorkers(int numberNewWorkers) noexcept
 {
-	adjustNumberWorkers(numberNewWorkers);
+   adjustNumberWorkers(numberNewWorkers);
 }
 
 //******************************************************************************
 
 void ThreadPool::removeWorkers(int numberWorkersToRemove) noexcept
 {
-	adjustNumberWorkers(-numberWorkersToRemove);
+   adjustNumberWorkers(-numberWorkersToRemove);
 }
 
 //******************************************************************************
@@ -118,24 +118,24 @@ void ThreadPool::removeWorkers(int numberWorkersToRemove) noexcept
 void ThreadPool::adjustNumberWorkers(int numberToAddOrDelete) noexcept
 {
    if (numberToAddOrDelete > 0) {   // adding?
-      
-		const int newNumberWorkers = m_workerCount + numberToAddOrDelete;
-		
-	   for (int i = m_workerCount; i < newNumberWorkers; ++i) {
+
+      const int newNumberWorkers = m_workerCount + numberToAddOrDelete;
+
+      for (int i = m_workerCount; i < newNumberWorkers; ++i) {
          ++m_workersCreated;
          ++m_workerCount;
          std::unique_ptr<ThreadPoolWorker> worker(
             new ThreadPoolWorker(m_threadingFactory, m_queue, m_workersCreated));
-         
+
          if (m_isRunning) {
             worker->start();
          }
-         
-	      m_listWorkers.push_back(std::move(worker));
-	   }
+
+         m_listWorkers.push_back(std::move(worker));
+      }
    } else if (numberToAddOrDelete < 0) {  // removing?
       if (m_isRunning) {
-	      // tell thread to shut down
+         // tell thread to shut down
       }
    }
 }

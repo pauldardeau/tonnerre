@@ -28,8 +28,7 @@ ThreadPoolWorker::ThreadPoolWorker(std::shared_ptr<ThreadingFactory> threadingFa
 
 ThreadPoolWorker::~ThreadPoolWorker() noexcept
 {
-   Logger::logInstanceDestroy("ThreadPoolWorker");
-   
+   Logger::logInstanceDestroy("ThreadPoolWorker");   
 }
 
 //******************************************************************************
@@ -67,13 +66,12 @@ void ThreadPoolWorker::run() noexcept
 
       std::shared_ptr<Runnable> runnable = m_poolQueue.takeRequest();
       if (runnable) {
-	      // has our thread been notified to shut down?
-	      if (!m_workerThread->isAlive()) {
-		      // put the request back on the front of the queue
-				m_isRunning = false;
-				continue;
-	      } else {
-            
+         // has our thread been notified to shut down?
+         if (!m_workerThread->isAlive()) {
+            // put the request back on the front of the queue
+            m_isRunning = false;
+            continue;
+         } else {
             // mark it
             runnable->setRunByThreadId(m_workerId);
             runnable->setRunByThreadWorkerId(m_workerThread->getWorkerId());
