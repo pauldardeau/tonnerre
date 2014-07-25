@@ -14,6 +14,7 @@ KqueueServer.o \
 Logger.o \
 Message.o \
 MessageRequestHandler.o \
+MessageSocketServiceHandler.o \
 Messaging.o \
 MessagingServer.o \
 PthreadsConditionVariable.o \
@@ -31,6 +32,7 @@ StdMutex.o \
 StdThread.o \
 StrUtils.o \
 StringTokenizer.o \
+SystemInfo.o \
 Thread.o \
 ThreadPool.o \
 ThreadPoolDispatch.o \

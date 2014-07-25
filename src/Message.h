@@ -22,7 +22,8 @@ public:
    
    static std::shared_ptr<Message> reconstruct(std::shared_ptr<Socket> socket);
    
-   Message(MessageType messageType=MessageType::Unknown);
+   Message();
+   Message(const std::string& requestName, MessageType messageType=MessageType::Unknown);
    Message(const Message& copy);
    Message(Message&& move);
    ~Message();
@@ -37,7 +38,7 @@ public:
    
    void setType(MessageType messageType);
    MessageType getType() const;
-   const std::string getRequestName() const;
+   std::string getRequestName() const;
    
    const KeyValuePairs& getKeyValuesPayload() const;
    const std::string& getTextPayload() const;

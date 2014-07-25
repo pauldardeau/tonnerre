@@ -6,7 +6,8 @@
 #include "SocketServer.h"
 
 class MessageHandler;
-
+class RequestHandler;
+class SocketServiceHandler;
 
 class MessagingServer : public SocketServer
 {
@@ -19,6 +20,7 @@ public:
    virtual std::shared_ptr<RequestHandler> handlerForSocket(std::shared_ptr<Socket> socket);
    virtual std::shared_ptr<RequestHandler> handlerForSocketRequest(std::shared_ptr<SocketRequest> socketRequest);
 
+   virtual std::shared_ptr<SocketServiceHandler> createSocketServiceHandler();
    
 private:
    MessageHandler* m_handler;

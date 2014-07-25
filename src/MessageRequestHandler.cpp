@@ -6,18 +6,16 @@
 
 //******************************************************************************
 
-MessageRequestHandler::MessageRequestHandler(SocketServer& socketServer, std::shared_ptr<Socket> socket) :
-   RequestHandler(socket),
-   m_socketServer(socketServer)
+MessageRequestHandler::MessageRequestHandler(std::shared_ptr<Socket> socket) :
+   RequestHandler(socket)
 {
    Logger::logInstanceCreate("MessageRequestHandler");
 }
 
 //******************************************************************************
 
-MessageRequestHandler::MessageRequestHandler(SocketServer& socketServer, std::shared_ptr<SocketRequest> socketRequest) :
-   RequestHandler(socketRequest),
-   m_socketServer(socketServer)
+MessageRequestHandler::MessageRequestHandler(std::shared_ptr<SocketRequest> socketRequest) :
+   RequestHandler(socketRequest)
 {
    Logger::logInstanceCreate("MessageRequestHandler");
 }
@@ -42,7 +40,7 @@ void MessageRequestHandler::run()
          const std::string& requestName = requestMessage->getRequestName();
          if (!requestName.empty()) {
             const Message::MessageType messageType = requestMessage->getType();
-            Message responseMessage(messageType);
+            Message responseMessage(requestName, messageType);
             if (messageType == Message::MessageType::KeyValues) {
                KeyValuePairs responsePayload;
                
@@ -57,14 +55,17 @@ void MessageRequestHandler::run()
                catch (const BasicException& be) 
                {
                   // BasicException caught
+                  Logger::error("execption caught in handling message: " + be.whatString());
                }
                catch (const std::exception& e)
                {
                   // exception caught
+                  Logger::error("exception caught in handling message: " + std::string(e.what()));
                }
                catch (...)
                {
                   // unknown exception caught
+                  Logger::error("exception caught in handling message");
                }
             } else if (messageType == Message::MessageType::Text) {
                std::string responsePayload;
@@ -80,30 +81,34 @@ void MessageRequestHandler::run()
                catch (const BasicException& be) 
                {
                   // BasicException caught
+                  Logger::error("execption caught in handling message: " + be.whatString());
                }
                catch (const std::exception& e)
                {
                   // exception caught
+                  Logger::error("exception caught in handling message: " + std::string(e.what()));
                }
                catch (...)
                {
                   // unknown exception caught
+                  Logger::error("exception caught in handling message");
                }
             }
          } else {
             // request name is empty
+            Logger::error("request name is empty");
          }
-         
       } else {
          // unable to reconstruct request message
+         Logger::error("unable to reconstruct request message");
       }
    } else {
       if (socket == nullptr) {
-         
+         Logger::error("no socket provided");
       }
       
       if (messageHandler == nullptr) {
-         
+         Logger::error("no message handler provided");
       }
    }
 }

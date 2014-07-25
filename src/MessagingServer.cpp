@@ -2,6 +2,7 @@
 #include "MessageHandler.h"
 #include "ServerSocket.h"
 #include "MessageRequestHandler.h"
+#include "MessageSocketServiceHandler.h"
 #include "Logger.h"
 
 //******************************************************************************
@@ -27,15 +28,21 @@ MessagingServer::~MessagingServer()
 
 std::shared_ptr<RequestHandler> MessagingServer::handlerForSocket(std::shared_ptr<Socket> socket)
 {
-   return std::shared_ptr<RequestHandler>(new MessageRequestHandler(*this, socket));
+   return std::shared_ptr<RequestHandler>(new MessageRequestHandler(socket));
 }
 
 //******************************************************************************
 
 std::shared_ptr<RequestHandler> MessagingServer::handlerForSocketRequest(std::shared_ptr<SocketRequest> socketRequest)
 {
-   return std::shared_ptr<RequestHandler>(new MessageRequestHandler(*this, socketRequest));
+   return std::shared_ptr<RequestHandler>(new MessageRequestHandler(socketRequest));
 }
 
 //******************************************************************************
 
+std::shared_ptr<SocketServiceHandler> MessagingServer::createSocketServiceHandler()
+{
+   return std::shared_ptr<SocketServiceHandler>(new MessageSocketServiceHandler());
+}
+
+//******************************************************************************

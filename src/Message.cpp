@@ -12,6 +12,8 @@
 #include "StringTokenizer.h"
 #include "Messaging.h"
 
+static const std::string EMPTY_STRING           = "";
+
 static const int MAX_STACK_BUFFER_SIZE          = 4096;
 static const int MAX_SEGMENT_LENGTH             = 32767;
 
@@ -23,6 +25,7 @@ static const std::string DELIMITER_PAIR         = ";";
 static const std::string KEY_ONE_WAY            = "1way";
 static const std::string KEY_PAYLOAD_LENGTH     = "payload_length";
 static const std::string KEY_PAYLOAD_TYPE       = "payload_type";
+static const std::string KEY_REQUEST_NAME       = "request";
 
 static const std::string VALUE_PAYLOAD_KVP      = "kvp";
 static const std::string VALUE_PAYLOAD_TEXT     = "text";
@@ -34,7 +37,7 @@ static const std::string VALUE_TRUE             = "true";
 
 std::shared_ptr<Message> Message::reconstruct(std::shared_ptr<Socket> socket)
 {
-   std::shared_ptr<Message> message(new Message(Message::MessageType::Unknown));
+   std::shared_ptr<Message> message(new Message());
    if (message->reconstitute(socket)) {
       return message;
    } else {
@@ -44,11 +47,21 @@ std::shared_ptr<Message> Message::reconstruct(std::shared_ptr<Socket> socket)
 
 //******************************************************************************
 
-Message::Message(MessageType messageType) :
+Message::Message() :
+   m_messageType(MessageType::Unknown),
+   m_isOneWay(false)
+{
+   Logger::logInstanceCreate("Message");
+}
+
+//******************************************************************************
+
+Message::Message(const std::string& requestName, MessageType messageType) :
    m_messageType(messageType),
    m_isOneWay(false)
 {
    Logger::logInstanceCreate("Message");
+   m_kvpHeaders.addPair(KEY_REQUEST_NAME, requestName);
 }
 
 //******************************************************************************
@@ -214,6 +227,17 @@ void Message::setTextPayload(const std::string& text)
 const std::string& Message::getServiceName() const
 {
    return m_serviceName;
+}
+
+//******************************************************************************
+
+std::string Message::getRequestName() const
+{
+   if (m_kvpHeaders.hasKey(KEY_REQUEST_NAME)) {
+      return std::string(m_kvpHeaders.getValue(KEY_REQUEST_NAME));
+   } else {
+      return EMPTY_STRING;
+   }
 }
 
 //******************************************************************************
