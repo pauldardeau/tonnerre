@@ -232,7 +232,7 @@ bool SocketServer::init(int port)
 {
    const bool isLoggingDebug = Logger::isLogging(Logger::LogLevel::Debug);
    
-	m_serverPort = port;
+   m_serverPort = port;
 	
    std::unique_ptr<SectionedConfigDataSource> configDataSource;
    
@@ -277,7 +277,7 @@ bool SocketServer::init(int port)
 
             if (portNumber > 0) {
                port = portNumber;
-					m_serverPort = portNumber;
+               m_serverPort = portNumber;
                
                if (isLoggingDebug) {
                   char msg[128];
@@ -410,7 +410,7 @@ bool SocketServer::init(int port)
          }
       }
 
-		m_startupTime = getLocalDateTime();
+      m_startupTime = getLocalDateTime();
    }
    catch (const BasicException& be)
    {
@@ -493,10 +493,10 @@ bool SocketServer::init(int port)
       }
    } else {
       concurrencyModel = "serial";
-		m_threadPoolSize = 1;   // not a pool, we have 1 processing thread
+      m_threadPoolSize = 1;   // not a pool, we have 1 processing thread
    }
 
-	m_concurrencyModel = concurrencyModel;
+   m_concurrencyModel = concurrencyModel;
 
    std::string portAsString = std::to_string(port);
 
