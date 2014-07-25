@@ -101,8 +101,8 @@ int main(int argc, char* argv[])
    //serviceName = SERVICE_STOOGE_INFO;
    MessageHandler* handler = nullptr;
    
-   std::shared_ptr<StdLogger> logger(new StdLogger(Logger::LogLevel::Debug));
-   logger->setLogInstanceLifecycles(true);
+   std::shared_ptr<StdLogger> logger(new StdLogger(Logger::LogLevel::Info));
+   //logger->setLogInstanceLifecycles(true);
    Logger::setLogger(logger);
    
    if (serviceName == SERVICE_SERVER_INFO) {
