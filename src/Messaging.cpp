@@ -1,5 +1,6 @@
 // Copyright Paul Dardeau, SwampBits LLC 2014
 // BSD License
+
 #include <vector>
 #include <stdlib.h>
 
