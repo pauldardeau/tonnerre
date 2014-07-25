@@ -28,21 +28,21 @@ MessagingServer::~MessagingServer()
 
 std::shared_ptr<RequestHandler> MessagingServer::handlerForSocket(std::shared_ptr<Socket> socket)
 {
-   return std::shared_ptr<RequestHandler>(new MessageRequestHandler(socket));
+   return std::shared_ptr<RequestHandler>(new MessageRequestHandler(socket, m_handler));
 }
 
 //******************************************************************************
 
 std::shared_ptr<RequestHandler> MessagingServer::handlerForSocketRequest(std::shared_ptr<SocketRequest> socketRequest)
 {
-   return std::shared_ptr<RequestHandler>(new MessageRequestHandler(socketRequest));
+   return std::shared_ptr<RequestHandler>(new MessageRequestHandler(socketRequest, m_handler));
 }
 
 //******************************************************************************
 
 std::shared_ptr<SocketServiceHandler> MessagingServer::createSocketServiceHandler()
 {
-   return std::shared_ptr<SocketServiceHandler>(new MessageSocketServiceHandler());
+   return std::shared_ptr<SocketServiceHandler>(new MessageSocketServiceHandler(m_handler));
 }
 
 //******************************************************************************

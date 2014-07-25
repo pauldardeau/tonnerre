@@ -173,6 +173,9 @@ bool Message::send(const std::string& serviceName, Message& responseMessage)
    std::shared_ptr<Socket> socket(socketForService(serviceName));
    
    if (socket != nullptr) {
+      //const std::string payload = toString();
+      //printf("payload: '%s'\n", payload.c_str());
+      
       if (socket->write(toString())) {
          return responseMessage.reconstitute(socket);
       } else {
@@ -274,7 +277,7 @@ bool Message::reconstitute(std::shared_ptr<Socket> socket)
       char headerLengthPrefixBuffer[11];
       memset(headerLengthPrefixBuffer, 0, NUM_CHARS_HEADER_LENGTH+1);
       
-      if (socket->read(headerLengthPrefixBuffer, NUM_CHARS_HEADER_LENGTH)) {
+      if (socket->readSocket(headerLengthPrefixBuffer, NUM_CHARS_HEADER_LENGTH)) {
          headerLengthPrefixBuffer[NUM_CHARS_HEADER_LENGTH] = '\0';
          
          std::string headerLengthPrefix = headerLengthPrefixBuffer;
@@ -291,7 +294,7 @@ bool Message::reconstitute(std::shared_ptr<Socket> socket)
                memset(stackBuffer, 0, MAX_STACK_BUFFER_SIZE);
                stackBufferZeroed = true;
                
-               if (socket->read(stackBuffer, headerLength)) {
+               if (socket->readSocket(stackBuffer, headerLength)) {
                   stackBuffer[headerLength] = '\0';
                   headerRead = true;
                   headerAsString = stackBuffer;
@@ -303,7 +306,7 @@ bool Message::reconstitute(std::shared_ptr<Socket> socket)
                if (headerLength <= MAX_SEGMENT_LENGTH) {
                   char* heapBuffer = new char[headerLength+1];
                   memset(heapBuffer, 0, headerLength+1);
-                  if (socket->read(heapBuffer, headerLength)) {
+                  if (socket->readSocket(heapBuffer, headerLength)) {
                      heapBuffer[headerLength] = '\0';
                      headerRead = true;
                      headerAsString = heapBuffer;
@@ -320,10 +323,9 @@ bool Message::reconstitute(std::shared_ptr<Socket> socket)
             }
             
             if (headerRead && !headerAsString.empty()) {
-               KeyValuePairs kvpHeaders;
-               if (fromString(headerAsString, kvpHeaders)) {
-                  if (kvpHeaders.hasKey(KEY_PAYLOAD_TYPE)) {
-                     const std::string& valuePayloadType = kvpHeaders.getValue(KEY_PAYLOAD_TYPE);
+               if (fromString(headerAsString, m_kvpHeaders)) {
+                  if (m_kvpHeaders.hasKey(KEY_PAYLOAD_TYPE)) {
+                     const std::string& valuePayloadType = m_kvpHeaders.getValue(KEY_PAYLOAD_TYPE);
                      
                      if (valuePayloadType == VALUE_PAYLOAD_TEXT) {
                         m_messageType = MessageType::Text;
@@ -337,8 +339,8 @@ bool Message::reconstitute(std::shared_ptr<Socket> socket)
                      return false;
                   }
                   
-                  if (kvpHeaders.hasKey(KEY_PAYLOAD_LENGTH)) {
-                     const std::string& valuePayloadLength = kvpHeaders.getValue(KEY_PAYLOAD_LENGTH);
+                  if (m_kvpHeaders.hasKey(KEY_PAYLOAD_LENGTH)) {
+                     const std::string& valuePayloadLength = m_kvpHeaders.getValue(KEY_PAYLOAD_LENGTH);
                      
                      if (!valuePayloadLength.empty()) {
                         const std::size_t payloadLength = std::atol(valuePayloadLength.c_str());
@@ -350,7 +352,7 @@ bool Message::reconstitute(std::shared_ptr<Socket> socket)
                            if (payloadLength < MAX_STACK_BUFFER_SIZE) {
                               memset(stackBuffer, 0, MAX_STACK_BUFFER_SIZE);
                               
-                              if (socket->read(stackBuffer, payloadLength)) {
+                              if (socket->readSocket(stackBuffer, payloadLength)) {
                                  stackBuffer[payloadLength] = '\0';
                                  payloadRead = true;
                                  payloadAsString = stackBuffer;
@@ -362,7 +364,7 @@ bool Message::reconstitute(std::shared_ptr<Socket> socket)
                               if (payloadLength <= MAX_SEGMENT_LENGTH) {
                                  char* heapBuffer = new char[payloadLength];
                                  memset(heapBuffer, 0, payloadLength);
-                                 if (socket->read(heapBuffer, payloadLength)) {
+                                 if (socket->readSocket(heapBuffer, payloadLength)) {
                                     heapBuffer[payloadLength] = '\0';
                                     payloadRead = true;
                                     payloadAsString = heapBuffer;
@@ -382,18 +384,15 @@ bool Message::reconstitute(std::shared_ptr<Socket> socket)
                               if (m_messageType == MessageType::Text) {
                                  m_textPayload = std::move(payloadAsString);
                               } else if (m_messageType == MessageType::KeyValues) {
-                                 KeyValuePairs kvpPayload;
-                                 if (fromString(payloadAsString, kvpPayload)) {
-                                    m_kvpPayload = std::move(kvpPayload);
-                                 }
+                                 fromString(payloadAsString, m_kvpPayload);
                               }
                            }
                         }
                      }
                   }
                   
-                  if (kvpHeaders.hasKey(KEY_ONE_WAY)) {
-                     const std::string& valueOneWay = kvpHeaders.getValue(KEY_ONE_WAY);
+                  if (m_kvpHeaders.hasKey(KEY_ONE_WAY)) {
+                     const std::string& valueOneWay = m_kvpHeaders.getValue(KEY_ONE_WAY);
                      if (valueOneWay == VALUE_TRUE) {
                         // mark it as being a 1-way message
                         m_isOneWay = true;
@@ -429,15 +428,15 @@ bool Message::reconstitute(std::shared_ptr<Socket> socket)
 
 std::string Message::toString() const
 {
-   std::size_t payloadLength = 0;
-   
    KeyValuePairs kvpHeaders(m_kvpHeaders);
+   std::string payload;
    
    if (m_messageType == MessageType::Text) {
       kvpHeaders.addPair(KEY_PAYLOAD_TYPE, VALUE_PAYLOAD_TEXT);
-      payloadLength = m_textPayload.length();
+      payload = m_textPayload;
    } else if (m_messageType == MessageType::KeyValues) {
       kvpHeaders.addPair(KEY_PAYLOAD_TYPE, VALUE_PAYLOAD_KVP);
+      payload = toString(m_kvpPayload);
    } else {
       kvpHeaders.addPair(KEY_PAYLOAD_TYPE, VALUE_PAYLOAD_UNKNOWN);
    }
@@ -446,22 +445,24 @@ std::string Message::toString() const
       kvpHeaders.addPair(KEY_ONE_WAY, VALUE_TRUE);
    }
    
+   if (m_kvpHeaders.hasKey(KEY_REQUEST_NAME)) {
+      kvpHeaders.addPair(KEY_REQUEST_NAME, m_kvpHeaders.getValue(KEY_REQUEST_NAME));
+   } else {
+      kvpHeaders.addPair(KEY_REQUEST_NAME, "");
+   }
+
+   const std::size_t payloadLength = payload.length();
    kvpHeaders.addPair(KEY_PAYLOAD_LENGTH, encodeLength(payloadLength));
    
    const std::string headersAsString = toString(kvpHeaders);
-
+   
    std::string headerLengthPrefix = encodeLength(headersAsString.length());
    StrUtils::padRight(headerLengthPrefix, ' ', NUM_CHARS_HEADER_LENGTH);
 
    std::string messageAsString;
    messageAsString += headerLengthPrefix;
    messageAsString += headersAsString;
-   
-   if (m_messageType == MessageType::Text) {
-      messageAsString += m_textPayload;
-   } else if (m_messageType == MessageType::KeyValues) {
-      messageAsString += toString(m_kvpPayload);
-   }
+   messageAsString += payload;
    
    return messageAsString;
 }

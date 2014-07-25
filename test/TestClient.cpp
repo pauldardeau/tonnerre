@@ -6,6 +6,8 @@
 #include "Message.h"
 #include "KeyValuePairs.h"
 #include "BasicException.h"
+#include "Logger.h"
+#include "StdLogger.h"
 
 //******************************************************************************
 
@@ -23,15 +25,23 @@ void PrintKeyValues(const KeyValuePairs& kvp)
 
 int main(int argc, char* argv[])
 {
+   std::shared_ptr<StdLogger> logger(new StdLogger(Logger::LogLevel::Debug));
+   logger->setLogInstanceLifecycles(true);
+   Logger::setLogger(logger);
+   
+   const std::string SERVICE_SERVER_INFO = "server_info";
+   const std::string SERVICE_ECHO        = "echo_service";
+   const std::string SERVICE_STOOGE_INFO = "stooge_info_service";
+
    std::string serviceName;
-   serviceName = "ServerInfo";
-   serviceName = "EchoService";
-   serviceName = "StoogeInfoService";
+   //serviceName = SERVICE_SERVER_INFO;
+   serviceName = SERVICE_ECHO;
+   //serviceName = SERVICE_STOOGE_INFO;
 
    try {
       Messaging::initialize("tonnerre.ini");
    
-      if (serviceName == "ServerInfo") {
+      if (serviceName == SERVICE_SERVER_INFO) {
          Message message("serverInfo", Message::MessageType::Text);
          Message response;
          if (message.send(serviceName, response)) {
@@ -40,7 +50,7 @@ int main(int argc, char* argv[])
          } else {
             std::printf("error: unable to send message to service '%s'\n", serviceName.c_str());
          }
-      } else if (serviceName == "EchoService") {
+      } else if (serviceName == SERVICE_ECHO) {
          KeyValuePairs kvp;
          kvp.addPair("firstName", "Mickey");
          kvp.addPair("lastName", "Mouse");
@@ -56,7 +66,7 @@ int main(int argc, char* argv[])
          } else {
             std::printf("error: unable to send message to service '%s'\n", serviceName.c_str());
          }
-      } else if (serviceName == "StoogeInfoService") {
+      } else if (serviceName == SERVICE_STOOGE_INFO) {
          Message message("listStooges", Message::MessageType::KeyValues);
          Message response;
          if (message.send(serviceName, response)) {

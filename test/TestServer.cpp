@@ -5,6 +5,8 @@
 #include "Message.h"
 #include "KeyValuePairs.h"
 #include "SystemInfo.h"
+#include "Logger.h"
+#include "StdLogger.h"
 
 //******************************************************************************
 //******************************************************************************
@@ -72,7 +74,11 @@ public:
                                const KeyValuePairs& requestPayload,
                                KeyValuePairs& responsePayload)
    {
+      printf("StoogesInfoServer.handleKeyValuesMessage called\n");
+      
       if (requestName == "listStooges") {
+         printf("listStooges request\n");
+         
          responsePayload.addPair("stooge1", "Moe");
          responsePayload.addPair("stooge2", "Larry");
          responsePayload.addPair("stooge3", "Curly");
@@ -85,22 +91,32 @@ public:
 
 int main(int argc, char* argv[])
 {
+   const std::string SERVICE_SERVER_INFO = "server_info";
+   const std::string SERVICE_ECHO        = "echo_service";
+   const std::string SERVICE_STOOGE_INFO = "stooge_info_service";
+
    std::string serviceName;
-   serviceName = "ServerInfo";
-   serviceName = "EchoService";
-   serviceName = "StoogeInfoService";
+   //serviceName = SERVICE_SERVER_INFO;
+   serviceName = SERVICE_ECHO;
+   //serviceName = SERVICE_STOOGE_INFO;
    MessageHandler* handler = nullptr;
    
-   if (serviceName == "ServerInfo") {
+   std::shared_ptr<StdLogger> logger(new StdLogger(Logger::LogLevel::Debug));
+   logger->setLogInstanceLifecycles(true);
+   Logger::setLogger(logger);
+   
+   if (serviceName == SERVICE_SERVER_INFO) {
       handler = new TestServerInfo();
-   } else if (serviceName == "EchoService") {
+   } else if (serviceName == SERVICE_ECHO) {
       handler = new TestEchoService();
-   } else if (serviceName == "StoogeInfoService") {
+   } else if (serviceName == SERVICE_STOOGE_INFO) {
       handler = new StoogeInfoService();
    }
    
    if (handler != nullptr) {
-      MessagingServer("tonnerre.ini", serviceName, handler);
+      MessagingServer server("tonnerre.ini", serviceName, handler);
+      server.run();
+      delete handler;
    }
 }
 

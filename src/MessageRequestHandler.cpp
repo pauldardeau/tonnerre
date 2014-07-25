@@ -3,19 +3,22 @@
 #include "BasicException.h"
 #include "Message.h"
 #include "Logger.h"
+#include "Socket.h"
 
 //******************************************************************************
 
-MessageRequestHandler::MessageRequestHandler(std::shared_ptr<Socket> socket) :
-   RequestHandler(socket)
+MessageRequestHandler::MessageRequestHandler(std::shared_ptr<Socket> socket, MessageHandler* handler) :
+   RequestHandler(socket),
+   m_handler(handler)
 {
    Logger::logInstanceCreate("MessageRequestHandler");
 }
 
 //******************************************************************************
 
-MessageRequestHandler::MessageRequestHandler(std::shared_ptr<SocketRequest> socketRequest) :
-   RequestHandler(socketRequest)
+MessageRequestHandler::MessageRequestHandler(std::shared_ptr<SocketRequest> socketRequest, MessageHandler* handler) :
+   RequestHandler(socketRequest),
+   m_handler(handler)
 {
    Logger::logInstanceCreate("MessageRequestHandler");
 }
@@ -32,7 +35,7 @@ MessageRequestHandler::~MessageRequestHandler()
 void MessageRequestHandler::run()
 {
    std::shared_ptr<Socket> socket(getSocket());
-   MessageHandler* messageHandler = nullptr;
+   MessageHandler* messageHandler = m_handler;
    
    if ((socket != nullptr) && (messageHandler != nullptr)) {
       std::shared_ptr<Message> requestMessage(Message::reconstruct(socket));
@@ -94,6 +97,11 @@ void MessageRequestHandler::run()
                   Logger::error("exception caught in handling message");
                }
             }
+            
+            if (!socket->write(responseMessage.toString())) {
+               Logger::error("writing response message to socket failed");
+            }
+            
          } else {
             // request name is empty
             Logger::error("request name is empty");

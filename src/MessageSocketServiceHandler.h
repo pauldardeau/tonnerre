@@ -8,13 +8,14 @@
 
 #include "SocketServiceHandler.h"
 
+class MessageHandler;
 class SocketRequest;
 
 
 class MessageSocketServiceHandler : public SocketServiceHandler
 {
 public:
-   MessageSocketServiceHandler();
+   MessageSocketServiceHandler(MessageHandler* handler);
    virtual ~MessageSocketServiceHandler();
    
    virtual void serviceSocket(std::shared_ptr<SocketRequest> socketRequest);
@@ -27,6 +28,7 @@ public:
    
 private:
    static const std::string handlerName;
+   MessageHandler* m_handler;
 
 };
 
