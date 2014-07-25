@@ -9,6 +9,7 @@
 #include "Logger.h"
 #include "StrUtils.h"
 #include "Socket.h"
+#include "StringTokenizer.h"
 
 static const int MAX_STACK_BUFFER_SIZE          = 4096;
 static const int MAX_SEGMENT_LENGTH             = 32767;
@@ -454,8 +455,29 @@ std::string Message::toString(const KeyValuePairs& kvp)
 
 bool Message::fromString(const std::string& s, KeyValuePairs& kvp)
 {
-   //TODO: implement fromString for KeyValuePairs
-   return false;
+   int numPairsAdded = 0;
+   
+   if (!s.empty()) {
+      StringTokenizer stPairs(s, DELIMITER_PAIR);
+      const std::size_t numPairs = stPairs.countTokens();
+      
+      if (numPairs > 0) {
+         while (stPairs.hasMoreTokens()) {
+            const std::string& keyValuePair = stPairs.nextToken();
+            
+            StringTokenizer stKeyValue(keyValuePair, DELIMITER_KEY_VALUE);
+            const std::size_t numTokens = stKeyValue.countTokens();
+            if (numTokens == 2) {
+               const std::string& key = stKeyValue.nextToken();
+               const std::string& value = stKeyValue.nextToken();
+               kvp.addPair(key, value);
+               ++numPairsAdded;
+            }
+         }
+      }
+   }
+   
+   return numPairsAdded > 0;
 }
 
 //******************************************************************************
