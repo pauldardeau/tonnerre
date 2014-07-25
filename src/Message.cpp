@@ -10,6 +10,7 @@
 #include "StrUtils.h"
 #include "Socket.h"
 #include "StringTokenizer.h"
+#include "Messaging.h"
 
 static const int MAX_STACK_BUFFER_SIZE          = 4096;
 static const int MAX_SEGMENT_LENGTH             = 32767;
@@ -219,7 +220,25 @@ const std::string& Message::getServiceName() const
 
 std::shared_ptr<Socket> Message::socketForService(const std::string& serviceName) const
 {
-   //TODO: implement socketForService
+   if (Messaging::isInitialized()) {
+      std::shared_ptr<Messaging> messaging(Messaging::getMessaging());
+      
+      if (messaging != nullptr) {
+         if (messaging->isServiceRegistered(serviceName)) {
+            const ServiceInfo& serviceInfo = messaging->getInfoForService(serviceName);
+            const std::string& host = serviceInfo.host();
+            const unsigned short port = serviceInfo.port();
+            return std::shared_ptr<Socket>(new Socket(host, port));
+         } else {
+            Logger::error("service is not registered");
+         }
+      } else {
+         Logger::error("Messaging::getMessaging returned nullptr, but isInitialized returns true");
+      }
+   } else {
+      Logger::error("messaging not initialized");
+   }
+   
    return nullptr;
 }
 

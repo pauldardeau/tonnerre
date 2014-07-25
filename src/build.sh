@@ -12,12 +12,14 @@ $CC $CC_OPTS KqueueServer.cpp
 $CC $CC_OPTS Logger.cpp
 $CC $CC_OPTS Message.cpp
 $CC $CC_OPTS MessageRequestHandler.cpp
+$CC $CC_OPTS Messaging.cpp
 $CC $CC_OPTS MessagingServer.cpp
 $CC $CC_OPTS PthreadsConditionVariable.cpp
 $CC $CC_OPTS PthreadsMutex.cpp
 $CC $CC_OPTS PthreadsThread.cpp
 $CC $CC_OPTS RequestHandler.cpp
 $CC $CC_OPTS ServerSocket.cpp
+$CC $CC_OPTS ServiceInfo.cpp
 $CC $CC_OPTS Socket.cpp
 $CC $CC_OPTS SocketRequest.cpp
 $CC $CC_OPTS SocketServer.cpp
