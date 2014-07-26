@@ -1,8 +1,8 @@
 // Copyright Paul Dardeau, SwampBits LLC 2014
 // BSD License
 
-#ifndef HttpServer_ThreadPoolDispatcher_h
-#define HttpServer_ThreadPoolDispatcher_h
+#ifndef THREADPOOLDISPATCHER_H
+#define THREADPOOLDISPATCHER_H
 
 #include <memory>
 
@@ -10,18 +10,41 @@
 class Runnable;
 
 
-/*!
+/**
  * ThreadPoolDispatcher is an abstract base class for handing off requests
  * to a thread pool to be dispatched.
  */
 class ThreadPoolDispatcher
 {
 public:
+   /**
+    * Default constructor
+    */
    ThreadPoolDispatcher() noexcept {}
+   
+   /**
+    * Destructor
+    */
    virtual ~ThreadPoolDispatcher() noexcept {}
    
+   /**
+    *
+    * @return
+    */
    virtual bool start() noexcept = 0;
+   
+   /**
+    *
+    * @return
+    */
    virtual bool stop() noexcept = 0;
+   
+   /**
+    *
+    * @param runnableRequest
+    * @return
+    * @see Runnable()
+    */
    virtual bool addRequest(std::shared_ptr<Runnable> runnableRequest) noexcept = 0;
    
 

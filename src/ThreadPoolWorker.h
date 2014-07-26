@@ -13,20 +13,43 @@ class ThreadPoolQueue;
 class Thread;
 
 
-/*!
+/**
  * ThreadPoolWorker provides the logic of pulling work off of a ThreadPoolQueue
  * and processing and then repeating. It's meant to be used within a ThreadPool.
  */
 class ThreadPoolWorker : public Runnable
 {
    public:
+      /**
+       *
+       * @param threadingFactory
+       * @param queue
+       * @param workerId
+       * @see ThreadingFactory()
+       * @see ThreadPoolQueue()
+       */
       ThreadPoolWorker(std::shared_ptr<ThreadingFactory> threadingFactory,
                        ThreadPoolQueue& queue,
                        int workerId) noexcept;
+                       
+      /**
+       * Destructor
+       */
       ~ThreadPoolWorker() noexcept;
 
+      /**
+       *
+       */
       void start() noexcept;
+      
+      /**
+       *
+       */
       void stop() noexcept;
+      
+      /**
+       *
+       */
       void run() noexcept override;
 
       // disallow copies

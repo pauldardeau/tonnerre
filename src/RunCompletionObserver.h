@@ -1,8 +1,8 @@
 // Copyright Paul Dardeau, SwampBits LLC 2014
 // BSD License
 
-#ifndef HttpServer_RunCompletionObserver_h
-#define HttpServer_RunCompletionObserver_h
+#ifndef RUNCOMPLETIONOBSERVER_H
+#define RUNCOMPLETIONOBSERVER_H
 
 
 class Runnable;

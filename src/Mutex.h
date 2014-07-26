@@ -1,8 +1,8 @@
 // Copyright Paul Dardeau, SwampBits LLC 2014
 // BSD License
 
-#ifndef HttpServer_Mutex_h
-#define HttpServer_Mutex_h
+#ifndef MUTEX_H
+#define MUTEX_H
 
 /**
  * Mutex is an interface for working with abstract mutexes.

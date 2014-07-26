@@ -22,20 +22,70 @@ class Runnable;
 class ThreadPool : public ThreadPoolDispatcher
 {
 public:
+   /**
+    *
+    * @param numberWorkers
+    */
    explicit ThreadPool(int numberWorkers) noexcept;
+   
+   /**
+    *
+    * @param threadingFactory
+    * @param numberWorkers
+    */
    ThreadPool(std::shared_ptr<ThreadingFactory> threadingFactory, int numberWorkers) noexcept;
 
+   /**
+    * Destructor
+    */
    ~ThreadPool() noexcept;
    
    // ThreadPoolDispatcher
+   /**
+    *
+    * @return
+    */
    virtual bool start() noexcept override;
+   
+   /**
+    *
+    * @return
+    */
    virtual bool stop() noexcept override;
+   
+   /**
+    *
+    * @param runnableRequest
+    * @return
+    * @see Runnable()
+    */
    virtual bool addRequest(std::shared_ptr<Runnable> runnableRequest) noexcept override;
    
+   /**
+    *
+    * @param runnable
+    * @return
+    * @see Runnable()
+    * @see Thread()
+    */
    virtual std::shared_ptr<Thread> createThreadWithRunnable(std::shared_ptr<Runnable> runnable) noexcept;
    
+   /**
+    *
+    * @return
+    */
    int getNumberWorkers() const noexcept;
+   
+   /**
+    *
+    * @param numberNewWorkers
+    */
    void addWorkers(int numberNewWorkers) noexcept;
+   
+   /**
+    *
+    * @param numberWorkersToRemove
+    */
    void removeWorkers(int numberWorkersToRemove) noexcept;
    
    ThreadPool(const ThreadPool&) = delete;
@@ -44,6 +94,10 @@ public:
    ThreadPool& operator=(ThreadPool&&) = delete;
    
 protected:
+   /**
+    *
+    * @param numberToAddOrDelete
+    */
    void adjustNumberWorkers(int numberToAddOrDelete) noexcept;
    
 private:
