@@ -1,8 +1,8 @@
 // Copyright Paul Dardeau, SwampBits LLC 2014
 // BSD License
 
-#ifndef __HttpServer__ThreadPool__
-#define __HttpServer__ThreadPool__
+#ifndef THREADPOOL_H
+#define THREADPOOL_H
 
 #include <list>
 #include <memory>
@@ -16,8 +16,8 @@
 class Runnable;
 
 
-/*!
- * ThreadPool is an abstract base class for thread pools.
+/**
+ * ThreadPool is an interface (abstract base class) for thread pools.
  */
 class ThreadPool : public ThreadPoolDispatcher
 {
@@ -55,4 +55,4 @@ private:
    bool m_isRunning;
 };
 
-#endif /* defined(__HttpServer__ThreadPool__) */
+#endif

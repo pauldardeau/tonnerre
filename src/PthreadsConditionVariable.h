@@ -1,25 +1,46 @@
 // Copyright Paul Dardeau, SwampBits LLC 2014
 // BSD License
 
-#ifndef __HttpServer__PthreadsConditionVariable__
-#define __HttpServer__PthreadsConditionVariable__
+#ifndef PTHREADSCONDITIONVARIABLE_H
+#define PTHREADSCONDITIONVARIABLE_H
 
 #include <pthread.h>
 
 #include "ConditionVariable.h"
 
 
-/*!
+/**
  *
  */
 class PthreadsConditionVariable : public ConditionVariable
 {
 public:
+   /**
+    * Default constructor
+    */
    PthreadsConditionVariable();
+   
+   /**
+    * Destructor
+    */
    ~PthreadsConditionVariable();
    
+   /**
+    *
+    * @param mutex
+    * @return
+    * @see Mutex()
+    */
    virtual bool wait(std::shared_ptr<Mutex> mutex) noexcept override;
+   
+   /**
+    *
+    */
    virtual void notifyOne() noexcept override;
+   
+   /**
+    *
+    */
    virtual void notifyAll() noexcept override;
 
 
@@ -35,5 +56,5 @@ private:
 };
 
 
-#endif /* defined(__HttpServer__PthreadsConditionVariable__) */
+#endif
 

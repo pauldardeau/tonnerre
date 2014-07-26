@@ -1,8 +1,8 @@
 // Copyright Paul Dardeau, SwampBits LLC 2014
 // BSD License
 
-#ifndef __RequestHandler__
-#define __RequestHandler__
+#ifndef REQUESTHANDLER_H
+#define REQUESTHANDLER_H
 
 
 #include "Runnable.h"
@@ -10,6 +10,10 @@
 class Socket;
 class SocketRequest;
 
+
+/**
+ *
+ */
 class RequestHandler : public Runnable
 {
 private:
@@ -43,7 +47,11 @@ public:
     */
    void setThreadPooling(bool isThreadPooling) noexcept;
    
-   
+   /**
+    *
+    * @return
+    * @see Socket()
+    */
    std::shared_ptr<Socket> getSocket() noexcept;
    
    
@@ -56,4 +64,4 @@ public:
    
 };
 
-#endif /* defined(__RequestHandler__) */
+#endif

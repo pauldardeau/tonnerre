@@ -1,8 +1,8 @@
 // Copyright Paul Dardeau, SwampBits LLC 2014
 // BSD License
 
-#ifndef __HttpServer__Thread__
-#define __HttpServer__Thread__
+#ifndef THREAD_H
+#define THREAD_H
 
 
 #include "Runnable.h"
@@ -12,7 +12,7 @@ class Mutex;
 class ThreadCompletionObserver;
 
 
-/*!
+/**
  * Thread is an abstract base class for working with threads.
  */
 class Thread : public Runnable
@@ -78,4 +78,4 @@ private:
 };
 
 
-#endif /* defined(__HttpServer__Thread__) */
+#endif

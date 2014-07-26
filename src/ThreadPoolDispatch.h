@@ -1,26 +1,49 @@
 // Copyright Paul Dardeau, SwampBits LLC 2014
 // BSD License
 
-#ifndef __HttpServer__ThreadPoolDispatch__
-#define __HttpServer__ThreadPoolDispatch__
+#ifndef THREADPOOLDISPATCH_H
+#define THREADPOOLDISPATCH_H
 
 #include "ThreadPoolDispatcher.h"
 
 class Runnable;
 
 
-/*!
- * ThreadPoolDispatch is a wrapper class for libDispatch (GCD)
+/**
+ *
  */
 class ThreadPoolDispatch : public ThreadPoolDispatcher
 {
 public:
+   /**
+    * Default constructor
+    */
    ThreadPoolDispatch() noexcept;
+   
+   /**
+    * Destructor
+    */
    ~ThreadPoolDispatch() noexcept;
    
    // ThreadPoolDispatcher
+   /**
+    *
+    * @return
+    */
    virtual bool start() noexcept override;
+   
+   /**
+    *
+    * @return
+    */
    virtual bool stop() noexcept override;
+   
+   /**
+    *
+    * @param runnableRequest
+    * @return
+    * @see Runnable()
+    */
    virtual bool addRequest(std::shared_ptr<Runnable> runnableRequest) noexcept override;
 
    // disallow copies
@@ -36,4 +59,4 @@ private:
 };
 
 
-#endif /* defined(__HttpServer__ThreadPoolDispatch__) */
+#endif

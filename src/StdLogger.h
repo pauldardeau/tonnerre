@@ -1,8 +1,8 @@
 // Copyright Paul Dardeau, SwampBits LLC 2014
 // BSD License
 
-#ifndef __HttpServer__StdLogger__
-#define __HttpServer__StdLogger__
+#ifndef STDLOGGER_H
+#define STDLOGGER_H
 
 #include <string>
 #include <unordered_map>
@@ -11,7 +11,9 @@
 #include "Logger.h"
 #include "Mutex.h"
 
-
+/**
+ *
+ */
 class LifecycleStats
 {
 public:
@@ -43,7 +45,7 @@ public:
    }
 };
 
-/*!
+/**
  * StdLogger is the default logger and logs to the console.
  */
 class StdLogger : public Logger
@@ -95,4 +97,4 @@ private:
 };
 
 
-#endif /* defined(__HttpServer__StdLogger__) */
+#endif
