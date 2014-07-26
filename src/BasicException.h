@@ -1,8 +1,8 @@
 // Copyright Paul Dardeau, SwampBits LLC 2014
 // BSD License
 
-#ifndef C10KServer_BasicException_h
-#define C10KServer_BasicException_h
+#ifndef BASICEXCEPTION_H
+#define BASICEXCEPTION_H
 
 #include <string>
 #include <exception>

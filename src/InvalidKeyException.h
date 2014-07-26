@@ -1,8 +1,8 @@
 // Copyright Paul Dardeau, SwampBits LLC 2014
 // BSD License
 
-#ifndef __HttpServer__InvalidKeyException__
-#define __HttpServer__InvalidKeyException__
+#ifndef INVALIDKEYEXCEPTION_H
+#define INVALIDKEYEXCEPTION_H
 
 #include "BasicException.h"
 
@@ -61,4 +61,4 @@ private:
 };
 
 
-#endif /* defined(__HttpServer__InvalidKeyException__) */
+#endif

@@ -1,8 +1,8 @@
 // Copyright Paul Dardeau, SwampBits LLC 2014
 // BSD License
 
-#ifndef IniReader_h
-#define IniReader_h
+#ifndef INIREADER_H
+#define INIREADER_H
 
 #include <string>
 
@@ -10,7 +10,7 @@
 
 class KeyValuePairs;
 
-/*!
+/**
  * IniReader is a utility class that knows how to read and parse a .ini
  * configuration file. .ini configuration files were popularized on Win32
  * platforms as a simple form of configuration files.
