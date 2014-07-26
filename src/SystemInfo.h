@@ -1,13 +1,13 @@
 // Copyright Paul Dardeau, SwampBits LLC 2014
 // BSD License
 
-#ifndef __HttpServer__SystemInfo__
-#define __HttpServer__SystemInfo__
+#ifndef SYSTEMINFO_H
+#define SYSTEMINFO_H
 
 #include <string>
 
 
-/*!
+/**
  * Wrapper/utility class around uname function
  */
 class SystemInfo
@@ -96,4 +96,4 @@ private:
    
 };
 
-#endif /* defined(__HttpServer__SystemInfo__) */
+#endif
