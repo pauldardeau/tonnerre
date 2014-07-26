@@ -1,8 +1,8 @@
 // Copyright Paul Dardeau, SwampBits LLC 2014
 // BSD License
 
-#ifndef KqueueServer_h
-#define KqueueServer_h
+#ifndef KQUEUESERVER_H
+#define KQUEUESERVER_H
 
 #include "KernelEventServer.h"
 
@@ -17,28 +17,84 @@ class Mutex;
 #endif
 
 
-/*!
+/**
  * KqueueServer is a wrapper for working with the kqueue API. The kqueue API
  * is a high-performance kernel event mechanism on FreeBSD and OSX.
  */
 class KqueueServer : public KernelEventServer
 {
 public:
+   /**
+    * Determines if the current platform supports the kqueue mechanism
+    * @return boolean indicating if kqueue mechanism is supported
+    */
    static bool isSupportedPlatform() noexcept;
    
+   /**
+    *
+    * @param fdMutex
+    * @param hwmConnectionsMutex
+    */
    KqueueServer(Mutex& fdMutex, Mutex& hwmConnectionsMutex) noexcept;
+   
+   /**
+    * Destructor
+    */
    ~KqueueServer() noexcept;
    
    // KernelEventServer
+   /**
+    *
+    * @param socketServiceHandler
+    * @param serverPort
+    * @param maxConnections
+    * @return
+    * @see SocketServiceHandler()
+    */
    virtual bool init(std::shared_ptr<SocketServiceHandler> socketServiceHandler,
                      int serverPort,
                      int maxConnections) noexcept override;
    
+   /**
+    *
+    * @param maxConnections
+    * @return
+    */
    virtual int getKernelEvents(int maxConnections) noexcept override;
+   
+   /**
+    *
+    * @param eventIndex
+    * @return
+    */
    virtual int fileDescriptorForEventIndex(int eventIndex) noexcept override;
+   
+  /**
+   *
+   * @param fileDescriptor
+   * @return
+   */
    virtual bool addFileDescriptorForRead(int fileDescriptor) noexcept override;
+   
+  /**
+   *
+   * @param fileDescriptor
+   * @return
+   */
    virtual bool removeFileDescriptorFromRead(int fileDescriptor) noexcept override;
+   
+  /**
+   *
+   * @param eventIndex
+   * @return
+   */
    virtual bool isEventDisconnect(int eventIndex) noexcept override;
+   
+  /**
+   *
+   * @param eventIndex
+   * @return
+   */
    virtual bool isEventRead(int eventIndex) noexcept override;
 
 

@@ -12,6 +12,9 @@ class MessageHandler;
 class RequestHandler;
 class SocketServiceHandler;
 
+/**
+ *
+ */
 class MessagingServer : public SocketServer
 {
 public:

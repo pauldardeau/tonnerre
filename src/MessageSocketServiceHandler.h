@@ -12,12 +12,29 @@ class MessageHandler;
 class SocketRequest;
 
 
+/**
+ *
+ */
 class MessageSocketServiceHandler : public SocketServiceHandler
 {
 public:
+   /**
+    *
+    * @param handler
+    * @see MessageHandler()
+    */
    MessageSocketServiceHandler(MessageHandler* handler);
+   
+   /**
+    * Destructor
+    */
    virtual ~MessageSocketServiceHandler();
    
+   /**
+    *
+    * @param socketRequest
+    * @see SocketRequest()
+    */
    virtual void serviceSocket(std::shared_ptr<SocketRequest> socketRequest);
    
    /**

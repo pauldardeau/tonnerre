@@ -11,13 +11,38 @@ class Socket;
 class SocketRequest;
 
 
+/**
+ *
+ */
 class MessageRequestHandler : public RequestHandler
 {
 public:
+   /**
+    *
+    * @param socket
+    * @param handler
+    * @see Socket()
+    * @see MessageHandler()
+    */
    MessageRequestHandler(std::shared_ptr<Socket> socket, MessageHandler* handler);
+   
+   /**
+    *
+    * @param socketRequest
+    * @param handler
+    * @see SocketRequest()
+    * @see MessageHandler()
+    */
    MessageRequestHandler(std::shared_ptr<SocketRequest> socketRequest, MessageHandler* handler);
+   
+   /**
+    * Destructor
+    */
    ~MessageRequestHandler();
    
+   /**
+    *
+    */
    virtual void run();
    
 private:
