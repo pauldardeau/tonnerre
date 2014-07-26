@@ -1,8 +1,8 @@
 // Copyright Paul Dardeau, SwampBits LLC 2014
 // BSD License
 
-#ifndef C10KServer_Socket_h
-#define C10KServer_Socket_h
+#ifndef SOCKET_H
+#define SOCKET_H
 
 #include <netinet/in.h>
 #include <sys/types.h>
@@ -12,7 +12,7 @@
 class Socket;
 class SocketCompletionObserver;
 
-/*!
+/**
  * Socket is very similar to Java's Socket class. It provides a wrapper class
  * for working with sockets.
  */

@@ -7,7 +7,7 @@
 #include <string>
 #include <vector>
 
-/*!
+/**
  * StringTokenizer is very similar to Java's StringTokenizer.
  */
 class StringTokenizer

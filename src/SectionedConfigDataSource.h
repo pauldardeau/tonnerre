@@ -8,7 +8,7 @@
 
 class KeyValuePairs;
 
-/*!
+/**
  * SectionedConfigDataSource is an interface for working with configuration
  * mechanisms based on sections, keys, and values.
  */

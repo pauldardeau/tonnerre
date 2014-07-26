@@ -1,8 +1,8 @@
 // Copyright Paul Dardeau, SwampBits LLC 2014
 // BSD License
 
-#ifndef C10KServer_SocketRequest_h
-#define C10KServer_SocketRequest_h
+#ifndef SOCKETREQUEST_H
+#define SOCKETREQUEST_H
 
 #include <memory>
 #include "Runnable.h"

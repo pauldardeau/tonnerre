@@ -1,8 +1,8 @@
 // Copyright Paul Dardeau, SwampBits LLC 2014
 // BSD License
 
-#ifndef C10KServer_SocketServiceHandler_h
-#define C10KServer_SocketServiceHandler_h
+#ifndef SOCKETSERVICEHANDLER_H
+#define SOCKETSERVICEHANDLER_H
 
 #include <string>
 
