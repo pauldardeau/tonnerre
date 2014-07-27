@@ -2,46 +2,17 @@
 # BSD License
 
 CC = clang++
-CC_OPTS = -c -std=c++11
+CC_OPTS = -c -std=c++11 -I../../chaudiere/src
 ARCHIVE_CMD = ar
 ARCHIVE_OPTS = rs
 
 LIB_NAME = libtonnerre.a
 
-OBJS = EpollServer.o \
-IniReader.o \
-InvalidKeyException.o \
-KernelEventServer.o \
-KeyValuePairs.o \
-KqueueServer.o \
-Logger.o \
-Message.o \
+OBJS =  Message.o \
 MessageRequestHandler.o \
 MessageSocketServiceHandler.o \
 Messaging.o \
-MessagingServer.o \
-PthreadsConditionVariable.o \
-PthreadsMutex.o \
-PthreadsThread.o \
-RequestHandler.o \
-ServerSocket.o \
-ServiceInfo.o \
-Socket.o \
-SocketRequest.o \
-SocketServer.o \
-StdConditionVariable.o \
-StdLogger.o \
-StdMutex.o \
-StdThread.o \
-StrUtils.o \
-StringTokenizer.o \
-SystemInfo.o \
-Thread.o \
-ThreadPool.o \
-ThreadPoolDispatch.o \
-ThreadPoolQueue.o \
-ThreadPoolWorker.o \
-ThreadingFactory.o
+MessagingServer.o
 
 all : $(LIB_NAME)
 
