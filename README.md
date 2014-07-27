@@ -40,9 +40,9 @@ and more C++11 compliant over time.
 
 Coding Style
 ------------
-You may find my coding style slightly peculiar, and that's ok. It's
-my personal style that I've adopted after a lot of experimentation
-about what works best for me.
+You may find my coding style slightly peculiar. It's my personal style
+that I've adopted after a lot of experimentation about what works best
+for me.
 
 What's An INI File
 ------------------
