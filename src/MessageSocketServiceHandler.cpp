@@ -6,6 +6,9 @@
 #include "MessageRequestHandler.h"
 #include "Logger.h"
 
+using namespace tonnerre;
+using namespace chaudiere;
+
 const std::string MessageSocketServiceHandler::handlerName = "MessageSocketServiceHandler";
 
 //******************************************************************************

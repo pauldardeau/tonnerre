@@ -32,10 +32,12 @@ static const std::string VALUE_PAYLOAD_TEXT     = "text";
 static const std::string VALUE_PAYLOAD_UNKNOWN  = "unknown";
 static const std::string VALUE_TRUE             = "true";
 
+using namespace chaudiere;
+using namespace tonnerre;
 
 //******************************************************************************
 
-std::shared_ptr<Message> Message::reconstruct(std::shared_ptr<Socket> socket)
+std::shared_ptr<tonnerre::Message> Message::reconstruct(std::shared_ptr<Socket> socket)
 {
    std::shared_ptr<Message> message(new Message());
    if (message->reconstitute(socket)) {

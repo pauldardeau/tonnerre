@@ -9,6 +9,9 @@
 #include "InvalidKeyException.h"
 #include "KeyValuePairs.h"
 
+using namespace tonnerre;
+using namespace chaudiere;
+
 std::shared_ptr<Messaging> Messaging::messagingInstance = nullptr;
 
 //******************************************************************************

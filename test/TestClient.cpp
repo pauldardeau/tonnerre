@@ -12,6 +12,9 @@
 #include "Logger.h"
 #include "StdLogger.h"
 
+using namespace tonnerre;
+using namespace chaudiere;
+
 //******************************************************************************
 
 void PrintKeyValues(const KeyValuePairs& kvp)

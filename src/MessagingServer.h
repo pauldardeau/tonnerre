@@ -7,15 +7,18 @@
 #include <string>
 
 #include "SocketServer.h"
+#include "RequestHandler.h"
+#include "SocketServiceHandler.h"
 
-class MessageHandler;
-class RequestHandler;
-class SocketServiceHandler;
+
+namespace tonnerre
+{
+   class MessageHandler;
 
 /**
  *
  */
-class MessagingServer : public SocketServer
+class MessagingServer : public chaudiere::SocketServer
 {
 public:
    static const std::string SERVER_NAME;
@@ -43,7 +46,7 @@ public:
     * @see RequestHandler()
     * @see Socket()
     */
-   virtual std::shared_ptr<RequestHandler> handlerForSocket(std::shared_ptr<Socket> socket);
+   virtual std::shared_ptr<chaudiere::RequestHandler> handlerForSocket(std::shared_ptr<chaudiere::Socket> socket);
    
   /**
    * Creates a request handler for the SocketRequest (used internally)
@@ -52,18 +55,20 @@ public:
    * @see RequestHandler()
    * @see SocketRequest()
    */
-   virtual std::shared_ptr<RequestHandler> handlerForSocketRequest(std::shared_ptr<SocketRequest> socketRequest);
+   virtual std::shared_ptr<chaudiere::RequestHandler> handlerForSocketRequest(std::shared_ptr<chaudiere::SocketRequest> socketRequest);
 
   /**
    * Creates a socket service handler (used internally)
    * @return a new instance of SocketServiceHandler
    * @see SocketServiceHandler()
    */
-   virtual std::shared_ptr<SocketServiceHandler> createSocketServiceHandler();
+   virtual std::shared_ptr<chaudiere::SocketServiceHandler> createSocketServiceHandler();
    
 private:
    MessageHandler* m_handler;
    std::string m_serviceName;
 };
+
+}
 
 #endif

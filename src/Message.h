@@ -7,9 +7,11 @@
 #include <string>
 
 #include "KeyValuePairs.h"
+#include "Socket.h"
 
-class Socket;
 
+namespace tonnerre
+{
 
 /**
  * The Message class is the primary object used for sending and receiving messages.
@@ -32,7 +34,7 @@ public:
     * @return a new Message object instance constructed by reading data from socket
     * @see Socket()
     */
-   static std::shared_ptr<Message> reconstruct(std::shared_ptr<Socket> socket);
+   static std::shared_ptr<Message> reconstruct(std::shared_ptr<chaudiere::Socket> socket);
    
    /**
     * Default constructor (used internally)
@@ -99,7 +101,7 @@ public:
     * @return boolean indicating whether the message was successfully reconstituted
     * @see Socket()
     */
-   bool reconstitute(std::shared_ptr<Socket> socket);
+   bool reconstitute(std::shared_ptr<chaudiere::Socket> socket);
    
    /**
     * Sets the type of the message
@@ -124,7 +126,7 @@ public:
     * @return reference to the key/values message payload
     * @see KeyValuePairs()
     */
-   const KeyValuePairs& getKeyValuesPayload() const;
+   const chaudiere::KeyValuePairs& getKeyValuesPayload() const;
    
    /**
     * Retrieves the textual payload associated with the message
@@ -137,7 +139,7 @@ public:
     * @param kvp the new key/values payload
     * @see KeyValuePairs()
     */
-   void setKeyValuesPayload(const KeyValuePairs& kvp);
+   void setKeyValuesPayload(const chaudiere::KeyValuePairs& kvp);
    
    /**
     * Sets the textual payload associated with the message
@@ -162,7 +164,7 @@ public:
     * @param kvp the KeyValuePairs object whose string representation is needed
     * @return the string representation of the KeyValuePairs object
     */
-   static std::string toString(const KeyValuePairs& kvp);
+   static std::string toString(const chaudiere::KeyValuePairs& kvp);
    
    /**
     * Reconstitutes the state of a KeyValuePairs from the specified string
@@ -171,7 +173,7 @@ public:
     * @return boolean indicating whether any state data was populated
     * @see KeyValuePairs()
     */
-   static bool fromString(const std::string& s, KeyValuePairs& kvp);
+   static bool fromString(const std::string& s, chaudiere::KeyValuePairs& kvp);
    
    /**
     * Encodes a length to a string so that it can be encoded in flattened message (used internally)
@@ -186,23 +188,25 @@ public:
     * @return the decoded length of the message header
     * @see Socket()
     */
-   static std::size_t decodeLength(std::shared_ptr<Socket> socket);
+   static std::size_t decodeLength(std::shared_ptr<chaudiere::Socket> socket);
    
    /**
     * Retrieves a socket connection for the specified service (used internally)
     * @param serviceName the name of the service whose connection is needed
     * @param a Socket instance on success, nullptr on failure
     */
-   std::shared_ptr<Socket> socketForService(const std::string& serviceName) const;
+   std::shared_ptr<chaudiere::Socket> socketForService(const std::string& serviceName) const;
    
 private:
    std::string m_serviceName;
    std::string m_textPayload;
-   KeyValuePairs m_kvpPayload;
-   KeyValuePairs m_kvpHeaders;
+   chaudiere::KeyValuePairs m_kvpPayload;
+   chaudiere::KeyValuePairs m_kvpHeaders;
    MessageType m_messageType;
    bool m_isOneWay;
    
 };
+
+}
 
 #endif

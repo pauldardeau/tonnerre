@@ -9,6 +9,8 @@
 
 #include "ServiceInfo.h"
 
+namespace tonnerre
+{
 
 /**
  * Messaging class provides a global entry point for initializing the messaging system
@@ -46,7 +48,7 @@ public:
     * @param serviceInfo the host/port values for the service
     * @see ServiceInfo()
     */
-   void registerService(const std::string& serviceName, const ServiceInfo& serviceInfo);
+   void registerService(const std::string& serviceName, const chaudiere::ServiceInfo& serviceInfo);
    
    /**
     * Determines if the specified service name has been registered
@@ -61,11 +63,13 @@ public:
     * @return object holding the host/port values for the service
     * @see ServiceInfo()
     */
-   const ServiceInfo& getInfoForService(const std::string& serviceName) const;
+   const chaudiere::ServiceInfo& getInfoForService(const std::string& serviceName) const;
 
 private:
    static std::shared_ptr<Messaging> messagingInstance;
-   std::unordered_map<std::string, ServiceInfo> m_mapServices;
+   std::unordered_map<std::string, chaudiere::ServiceInfo> m_mapServices;
 };
+
+}
 
 #endif

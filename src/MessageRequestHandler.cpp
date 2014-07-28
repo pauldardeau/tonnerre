@@ -7,6 +7,10 @@
 #include "Message.h"
 #include "Logger.h"
 #include "Socket.h"
+#include "KeyValuePairs.h"
+
+using namespace tonnerre;
+using namespace chaudiere;
 
 //******************************************************************************
 

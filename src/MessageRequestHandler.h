@@ -6,15 +6,15 @@
 
 #include "RequestHandler.h"
 
-class MessageHandler;
-class Socket;
-class SocketRequest;
 
+namespace tonnerre
+{
+   class MessageHandler;
 
 /**
  *
  */
-class MessageRequestHandler : public RequestHandler
+class MessageRequestHandler : public chaudiere::RequestHandler
 {
 public:
    /**
@@ -24,7 +24,7 @@ public:
     * @see Socket()
     * @see MessageHandler()
     */
-   MessageRequestHandler(std::shared_ptr<Socket> socket, MessageHandler* handler);
+   MessageRequestHandler(std::shared_ptr<chaudiere::Socket> socket, MessageHandler* handler);
    
    /**
     *
@@ -33,7 +33,7 @@ public:
     * @see SocketRequest()
     * @see MessageHandler()
     */
-   MessageRequestHandler(std::shared_ptr<SocketRequest> socketRequest, MessageHandler* handler);
+   MessageRequestHandler(std::shared_ptr<chaudiere::SocketRequest> socketRequest, MessageHandler* handler);
    
    /**
     * Destructor
@@ -48,5 +48,7 @@ public:
 private:
    MessageHandler* m_handler;
 };
+
+}
 
 #endif

@@ -8,6 +8,8 @@
 #include "MessageSocketServiceHandler.h"
 #include "Logger.h"
 
+using namespace tonnerre;
+using namespace chaudiere;
 
 const std::string MessagingServer::SERVER_NAME     = "Tonnerre";
 const std::string MessagingServer::SERVER_VERSION  = "0.1";

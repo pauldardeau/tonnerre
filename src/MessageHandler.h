@@ -6,9 +6,12 @@
 
 #include <string>
 
-class KeyValuePairs;
-class Message;
+#include "KeyValuePairs.h"
 
+
+namespace tonnerre
+{
+   class Message;
 
 /**
  * MessageHandler is the interface (abstract based class) to use for all
@@ -47,9 +50,11 @@ public:
    virtual void handleKeyValuesMessage(std::shared_ptr<Message> requestMessage,
                                        Message& responseMessage,
                                        const std::string& requestName,
-                                       const KeyValuePairs& requestPayload,
-                                       KeyValuePairs& responsePayload) = 0;
+                                       const chaudiere::KeyValuePairs& requestPayload,
+                                       chaudiere::KeyValuePairs& responsePayload) = 0;
    
 };
+
+}
 
 #endif

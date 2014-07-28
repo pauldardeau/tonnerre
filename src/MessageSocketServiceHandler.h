@@ -7,15 +7,17 @@
 #include <string>
 
 #include "SocketServiceHandler.h"
+#include "SocketRequest.h"
 
-class MessageHandler;
-class SocketRequest;
 
+namespace tonnerre
+{
+   class MessageHandler;
 
 /**
  *
  */
-class MessageSocketServiceHandler : public SocketServiceHandler
+class MessageSocketServiceHandler : public chaudiere::SocketServiceHandler
 {
 public:
    /**
@@ -35,7 +37,7 @@ public:
     * @param socketRequest
     * @see SocketRequest()
     */
-   virtual void serviceSocket(std::shared_ptr<SocketRequest> socketRequest);
+   virtual void serviceSocket(std::shared_ptr<chaudiere::SocketRequest> socketRequest);
    
    /**
     * Retrieves the name of the handler. This is primarily an aid for debugging.
@@ -48,5 +50,7 @@ private:
    MessageHandler* m_handler;
 
 };
+
+}
 
 #endif

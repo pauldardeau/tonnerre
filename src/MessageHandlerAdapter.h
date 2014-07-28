@@ -5,6 +5,10 @@
 #define MESSAGEHANDLERADAPTER_H
 
 #include "MessageHandler.h"
+#include "KeyValuePairs.h"
+
+namespace tonnerre
+{
 
 /**
  *
@@ -42,8 +46,10 @@ public:
    virtual void handleKeyValuesMessage(std::shared_ptr<Message> requestMessage,
                                        Message& responseMessage,
                                        const std::string& requestName,
-                                       const KeyValuePairs& requestPayload,
-                                       KeyValuePairs& responsePayload) {}
+                                       const chaudiere::KeyValuePairs& requestPayload,
+                                       chaudiere::KeyValuePairs& responsePayload) {}
 };
+
+}
 
 #endif
