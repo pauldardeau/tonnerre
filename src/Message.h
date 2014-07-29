@@ -177,7 +177,7 @@ public:
    
    /**
     * Encodes a length to a string so that it can be encoded in flattened message (used internally)
-    * @param the length in bytes to encode
+    * @param lengthBytes the length in bytes to encode
     * @return the string representation of the length
     */
    static std::string encodeLength(std::size_t lengthBytes);
@@ -193,7 +193,7 @@ public:
    /**
     * Retrieves a socket connection for the specified service (used internally)
     * @param serviceName the name of the service whose connection is needed
-    * @param a Socket instance on success, nullptr on failure
+    * @return a Socket instance on success, nullptr on failure
     */
    std::shared_ptr<chaudiere::Socket> socketForService(const std::string& serviceName) const;
    

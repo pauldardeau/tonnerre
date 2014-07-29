@@ -44,7 +44,7 @@ public:
    
    /**
     * Registers a service with its name and host/port values
-    * @param serviceName the name of the sevice being registered
+    * @param serviceName the name of the service being registered
     * @param serviceInfo the host/port values for the service
     * @see ServiceInfo()
     */
