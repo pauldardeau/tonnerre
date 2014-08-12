@@ -1,8 +1,8 @@
 // Copyright Paul Dardeau, SwampBits LLC 2014
 // BSD License
 
-#ifndef MESSAGEHANDLERADAPTER_H
-#define MESSAGEHANDLERADAPTER_H
+#ifndef TONNERRE_MESSAGEHANDLERADAPTER_H
+#define TONNERRE_MESSAGEHANDLERADAPTER_H
 
 #include "MessageHandler.h"
 #include "KeyValuePairs.h"

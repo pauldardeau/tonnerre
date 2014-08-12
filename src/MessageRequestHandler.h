@@ -1,8 +1,8 @@
 // Copyright Paul Dardeau, SwampBits LLC 2014
 // BSD License
 
-#ifndef MESSAGEREQUESTHANDLER_H
-#define MESSAGEREQUESTHANDLER_H
+#ifndef TONNERRE_MESSAGEREQUESTHANDLER_H
+#define TONNERRE_MESSAGEREQUESTHANDLER_H
 
 #include "RequestHandler.h"
 

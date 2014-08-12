@@ -1,8 +1,8 @@
 // Copyright Paul Dardeau, SwampBits LLC 2014
 // BSD License
 
-#ifndef MESSAGING_H
-#define MESSAGING_H
+#ifndef TONNERRE_MESSAGING_H
+#define TONNERRE_MESSAGING_H
 
 #include <string>
 #include <unordered_map>

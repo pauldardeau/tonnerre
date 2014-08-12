@@ -1,8 +1,8 @@
 // Copyright Paul Dardeau, SwampBits LLC 2014
 // BSD License
 
-#ifndef MESSAGE_H
-#define MESSAGE_H
+#ifndef TONNERRE_MESSAGE_H
+#define TONNERRE_MESSAGE_H
 
 #include <string>
 
@@ -196,6 +196,28 @@ public:
     * @return a Socket instance on success, nullptr on failure
     */
    std::shared_ptr<chaudiere::Socket> socketForService(const std::string& serviceName) const;
+   
+   /**
+    * Sets the specified key/value pair in the headers
+    * @param key the new header key
+    * @param value the new header value
+    */
+   void setHeader(const std::string& key, const std::string& value);
+   
+   /**
+    * Determines if the specified key exists in the headers
+    * @param key whose existence is being tested
+    * @return boolean indicating whether the key exists in the headers
+    */
+   bool hasHeader(const std::string& key) const;
+   
+   /**
+    * Retrieves the header value associated with the specified key
+    * @param key header key whose value is being retrieved
+    * @return reference to header value
+    * @throw InvalidKeyException
+    */
+   const std::string& getHeader(const std::string& key) const;
    
 private:
    std::string m_serviceName;

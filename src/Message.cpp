@@ -555,3 +555,23 @@ std::size_t Message::decodeLength(std::shared_ptr<Socket> socket)
 
 //******************************************************************************
 
+void Message::setHeader(const std::string& key, const std::string& value)
+{
+   m_kvpHeaders.addPair(key, value);
+}
+
+//******************************************************************************
+
+bool Message::hasHeader(const std::string& key) const
+{
+   return m_kvpHeaders.hasKey(key);
+}
+
+//******************************************************************************
+
+const std::string& Message::getHeader(const std::string& key) const
+{
+   return m_kvpHeaders.getValue(key);
+}
+
+//******************************************************************************

@@ -1,8 +1,8 @@
 // Copyright Paul Dardeau, SwampBits LLC 2014
 // BSD License
 
-#ifndef MESSAGINGSERVER_H
-#define MESSAGINGSERVER_H
+#ifndef TONNERRE_MESSAGINGSERVER_H
+#define TONNERRE_MESSAGINGSERVER_H
 
 #include <string>
 

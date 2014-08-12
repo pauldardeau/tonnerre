@@ -1,8 +1,8 @@
 // Copyright Paul Dardeau, SwampBits LLC 2014
 // BSD License
 
-#ifndef MESSAGEHANDLER_H
-#define MESSAGEHANDLER_H
+#ifndef TONNERRE_MESSAGEHANDLER_H
+#define TONNERRE_MESSAGEHANDLER_H
 
 #include <string>
 
