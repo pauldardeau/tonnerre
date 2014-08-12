@@ -35,6 +35,13 @@ MessagingServer::~MessagingServer()
 
 //******************************************************************************
 
+void MessagingServer::setMessageHandler(MessageHandler* handler)
+{
+   m_handler = handler;
+}
+
+//******************************************************************************
+
 std::shared_ptr<RequestHandler> MessagingServer::handlerForSocket(std::shared_ptr<Socket> socket)
 {
    return std::shared_ptr<RequestHandler>(new MessageRequestHandler(socket, m_handler));

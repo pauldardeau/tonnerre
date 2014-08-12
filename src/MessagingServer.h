@@ -32,12 +32,18 @@ public:
     */
    MessagingServer(const std::string& configFilePath,
                    const std::string& serviceName,
-                   MessageHandler* handler);
+                   MessageHandler* handler=nullptr);
                    
    /**
     * Destructor
     */
    ~MessagingServer();
+   
+   /**
+    * Sets the message handler
+    * @param handler the handler to use
+    */
+   void setMessageHandler(MessageHandler* handler);
 
    /**
     * Creates a request handler for the socket (used internally)
