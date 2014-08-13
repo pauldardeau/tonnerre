@@ -55,7 +55,7 @@ void MessageRequestHandler::run()
                KeyValuePairs responsePayload;
                
                try {
-                  messageHandler->handleKeyValuesMessage(requestMessage,
+                  messageHandler->handleKeyValuesMessage(*requestMessage,
                                                          responseMessage,
                                                          requestName,
                                                          requestMessage->getKeyValuesPayload(),
@@ -81,7 +81,7 @@ void MessageRequestHandler::run()
                std::string responsePayload;
                
                try {
-                  messageHandler->handleTextMessage(requestMessage,
+                  messageHandler->handleTextMessage(*requestMessage,
                                                     responseMessage,
                                                     requestName,
                                                     requestMessage->getTextPayload(),

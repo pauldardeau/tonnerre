@@ -29,7 +29,7 @@ public:
     * @param requestPayload
     * @param responsePayload
     */
-   virtual void handleTextMessage(std::shared_ptr<Message> requestMessage,
+   virtual void handleTextMessage(const Message& requestMessage,
                                   Message& responseMessage,
                                   const std::string& requestName,
                                   const std::string& requestPayload,
@@ -43,7 +43,7 @@ public:
     * @param requestPayload
     * @param responsePayload
     */
-   virtual void handleKeyValuesMessage(std::shared_ptr<Message> requestMessage,
+   virtual void handleKeyValuesMessage(const Message& requestMessage,
                                        Message& responseMessage,
                                        const std::string& requestName,
                                        const chaudiere::KeyValuePairs& requestPayload,

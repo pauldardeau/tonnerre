@@ -31,7 +31,7 @@ public:
     * @param responsePayload the response payload text
     * @see Message()
     */
-   virtual void handleTextMessage(std::shared_ptr<Message> requestMessage,
+   virtual void handleTextMessage(const Message& requestMessage,
                                   Message& responseMessage,
                                   const std::string& requestName,
                                   const std::string& requestPayload,
@@ -47,7 +47,7 @@ public:
     * @see Message()
     * @see KeyValuePairs()
     */
-   virtual void handleKeyValuesMessage(std::shared_ptr<Message> requestMessage,
+   virtual void handleKeyValuesMessage(const Message& requestMessage,
                                        Message& responseMessage,
                                        const std::string& requestName,
                                        const chaudiere::KeyValuePairs& requestPayload,

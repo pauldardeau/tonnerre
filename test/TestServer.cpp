@@ -20,7 +20,7 @@ using namespace chaudiere;
 class TestServerInfo : public MessageHandlerAdapter
 {
 public:
-   void handleTextMessage(std::shared_ptr<Message> requestMessage,
+   void handleTextMessage(const Message& requestMessage,
                           Message& responseMessage,
                           const std::string& requestName,
                           const std::string& requestPayload,
@@ -56,7 +56,7 @@ public:
 class TestEchoService : public MessageHandlerAdapter
 {
 public:
-   void handleKeyValuesMessage(std::shared_ptr<Message> requestMessage,
+   void handleKeyValuesMessage(const Message& requestMessage,
                                Message& responseMessage,
                                const std::string& requestName,
                                const KeyValuePairs& requestPayload,
@@ -74,7 +74,7 @@ public:
 class StoogeInfoService : public MessageHandlerAdapter
 {
 public:
-   void handleKeyValuesMessage(std::shared_ptr<Message> requestMessage,
+   void handleKeyValuesMessage(const Message& requestMessage,
                                Message& responseMessage,
                                const std::string& requestName,
                                const KeyValuePairs& requestPayload,
