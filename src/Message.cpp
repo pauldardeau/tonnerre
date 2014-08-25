@@ -51,7 +51,8 @@ std::shared_ptr<tonnerre::Message> Message::reconstruct(std::shared_ptr<Socket> 
 
 Message::Message() :
    m_messageType(MessageType::Unknown),
-   m_isOneWay(false)
+   m_isOneWay(false),
+   m_persistentConnection(false)
 {
    Logger::logInstanceCreate("Message");
 }
@@ -60,7 +61,8 @@ Message::Message() :
 
 Message::Message(const std::string& requestName, MessageType messageType) :
    m_messageType(messageType),
-   m_isOneWay(false)
+   m_isOneWay(false),
+   m_persistentConnection(false)
 {
    Logger::logInstanceCreate("Message");
    m_kvpHeaders.addPair(KEY_REQUEST_NAME, requestName);
@@ -74,7 +76,8 @@ Message::Message(const Message& copy) :
    m_kvpPayload(copy.m_kvpPayload),
    m_kvpHeaders(copy.m_kvpHeaders),
    m_messageType(copy.m_messageType),
-   m_isOneWay(copy.m_isOneWay)
+   m_isOneWay(copy.m_isOneWay),
+   m_persistentConnection(false)
 {
    Logger::logInstanceCreate("Message");
 }
@@ -87,7 +90,8 @@ Message::Message(Message&& move) :
    m_kvpPayload(std::move(move.m_kvpPayload)),
    m_kvpHeaders(std::move(move.m_kvpHeaders)),
    m_messageType(move.m_messageType),
-   m_isOneWay(move.m_isOneWay)
+   m_isOneWay(move.m_isOneWay),
+   m_persistentConnection(false)
 {
    Logger::logInstanceCreate("Message");
 }
@@ -113,6 +117,7 @@ Message& Message::operator=(const Message& copy)
    m_kvpHeaders = copy.m_kvpHeaders;
    m_messageType = copy.m_messageType;
    m_isOneWay = copy.m_isOneWay;
+   m_persistentConnection = false;
    
    return *this;
 }
@@ -131,6 +136,7 @@ Message& Message::operator=(Message&& move)
    m_kvpHeaders = std::move(move.m_kvpHeaders);
    m_messageType = move.m_messageType;
    m_isOneWay = move.m_isOneWay;
+   m_persistentConnection = false;
    
    return *this;
 }
@@ -150,11 +156,14 @@ bool Message::send(const std::string& serviceName)
       m_isOneWay = true;
       
       if (socket->write(toString())) {
+         returnSocketForService(serviceName, socket);
          return true;
       } else {
          // unable to write to socket
          Logger::error("unable to write to socket");
       }
+      
+      returnSocketForService(serviceName, socket);
    } else {
       // unable to connect to service
       Logger::error("unable to connect to service");
@@ -179,11 +188,15 @@ bool Message::send(const std::string& serviceName, Message& responseMessage)
       //printf("payload: '%s'\n", payload.c_str());
       
       if (socket->write(toString())) {
-         return responseMessage.reconstitute(socket);
+         const bool rc = responseMessage.reconstitute(socket);
+         returnSocketForService(serviceName, socket);
+         return rc;
       } else {
          // unable to write to socket
          Logger::error("unable to write to socket");
       }
+      
+      returnSocketForService(serviceName, socket);
    } else {
       // unable to connect to service
       Logger::error("unable to connect to service");
@@ -249,20 +262,25 @@ std::string Message::getRequestName() const
 
 std::shared_ptr<Socket> Message::socketForService(const std::string& serviceName) const
 {
-   if (Messaging::isInitialized()) {
-      std::shared_ptr<Messaging> messaging(Messaging::getMessaging());
-      
-      if (messaging != nullptr) {
-         if (messaging->isServiceRegistered(serviceName)) {
-            const ServiceInfo& serviceInfo = messaging->getInfoForService(serviceName);
-            const std::string& host = serviceInfo.host();
-            const unsigned short port = serviceInfo.port();
-            return std::shared_ptr<Socket>(new Socket(host, port));
-         } else {
-            Logger::error("service is not registered");
+   std::shared_ptr<Messaging> messaging(Messaging::getMessaging());
+   
+   if (messaging != nullptr) {
+      if (messaging->isServiceRegistered(serviceName)) {
+         const ServiceInfo& serviceInfo = messaging->getInfoForService(serviceName);
+         const std::string& host = serviceInfo.host();
+         const unsigned short port = serviceInfo.port();
+         const bool persistentConnection = serviceInfo.getPersistentConnection();
+         std::shared_ptr<Socket> socket = nullptr;
+            
+         if (persistentConnection) {
+            m_persistentConnection = true;
+            socket =
+               std::shared_ptr<Socket>(messaging->socketForService(serviceInfo));
          }
+            
+         return socket;
       } else {
-         Logger::error("Messaging::getMessaging returned nullptr, but isInitialized returns true");
+         Logger::error("service is not registered");
       }
    } else {
       Logger::error("messaging not initialized");
@@ -273,6 +291,26 @@ std::shared_ptr<Socket> Message::socketForService(const std::string& serviceName
 
 //******************************************************************************
 
+void Message::returnSocketForService(const std::string& serviceName,
+                                     std::shared_ptr<chaudiere::Socket> socket)
+{
+   if (m_persistentConnection) {
+      if (!serviceName.empty() && (socket != nullptr)) {
+         std::shared_ptr<Messaging> messaging(Messaging::getMessaging());
+         if (messaging != nullptr) {
+            if (messaging->isServiceRegistered(serviceName)) {
+               const ServiceInfo& serviceInfo = messaging->getInfoForService(serviceName);
+               if (serviceInfo.getPersistentConnection()) {
+                  messaging->returnSocketForService(serviceInfo, socket);
+               }
+            }
+         }
+      }
+   }
+}
+
+//******************************************************************************
+   
 bool Message::reconstitute(std::shared_ptr<Socket> socket)
 {
    if (socket != nullptr) {

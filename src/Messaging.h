@@ -8,6 +8,8 @@
 #include <unordered_map>
 
 #include "ServiceInfo.h"
+#include "Socket.h"
+#include "Mutex.h"
 
 namespace tonnerre
 {
@@ -42,6 +44,14 @@ public:
     */
    static bool isInitialized();
    
+   Messaging();
+   ~Messaging();
+   
+   Messaging(const Messaging&) = delete;
+   Messaging(Messaging&&) = delete;
+   Messaging& operator=(const Messaging&) = delete;
+   Messaging& operator=(Messaging&&) = delete;
+   
    /**
     * Registers a service with its name and host/port values
     * @param serviceName the name of the service being registered
@@ -64,10 +74,18 @@ public:
     * @see ServiceInfo()
     */
    const chaudiere::ServiceInfo& getInfoForService(const std::string& serviceName) const;
+   
+   std::shared_ptr<chaudiere::Socket> socketForService(const chaudiere::ServiceInfo& serviceInfo);
+
+   void returnSocketForService(const chaudiere::ServiceInfo& serviceInfo,
+                               std::shared_ptr<chaudiere::Socket> socket);
+
 
 private:
    static std::shared_ptr<Messaging> messagingInstance;
    std::unordered_map<std::string, chaudiere::ServiceInfo> m_mapServices;
+   std::unordered_map<std::string, std::shared_ptr<chaudiere::Socket>> m_mapSocketConnections;
+   std::shared_ptr<chaudiere::Mutex> m_mutex;
 };
 
 }

@@ -196,7 +196,15 @@ public:
     * @return a Socket instance on success, nullptr on failure
     */
    std::shared_ptr<chaudiere::Socket> socketForService(const std::string& serviceName) const;
-   
+
+   /**
+    *
+    * @param serviceName
+    * @param socket
+    */
+   void returnSocketForService(const std::string& serviceName,
+                               std::shared_ptr<chaudiere::Socket> socket);
+                               
    /**
     * Sets the specified key/value pair in the headers
     * @param key the new header key
@@ -226,6 +234,7 @@ private:
    chaudiere::KeyValuePairs m_kvpHeaders;
    MessageType m_messageType;
    bool m_isOneWay;
+   mutable bool m_persistentConnection;
    
 };
 
