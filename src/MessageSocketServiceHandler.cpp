@@ -1,6 +1,8 @@
 // Copyright Paul Dardeau, SwampBits LLC 2014
 // BSD License
 
+#include <memory>
+
 #include "MessageSocketServiceHandler.h"
 #include "SocketRequest.h"
 #include "MessageRequestHandler.h"

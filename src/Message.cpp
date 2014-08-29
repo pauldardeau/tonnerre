@@ -4,6 +4,7 @@
 #include <string>
 #include <vector>
 #include <cstdlib>
+#include <string.h>
 
 #include "Message.h"
 #include "Logger.h"
