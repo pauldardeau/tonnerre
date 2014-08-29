@@ -267,8 +267,8 @@ std::shared_ptr<Socket> Message::socketForService(const std::string& serviceName
    if (messaging != nullptr) {
       if (messaging->isServiceRegistered(serviceName)) {
          const ServiceInfo& serviceInfo = messaging->getInfoForService(serviceName);
-         const std::string& host = serviceInfo.host();
-         const unsigned short port = serviceInfo.port();
+         //const std::string& host = serviceInfo.host();
+         //const unsigned short port = serviceInfo.port();
          const bool persistentConnection = serviceInfo.getPersistentConnection();
          std::shared_ptr<Socket> socket = nullptr;
             
@@ -310,10 +310,53 @@ void Message::returnSocketForService(const std::string& serviceName,
 }
 
 //******************************************************************************
+
+std::string Message::readSocketBytes(std::shared_ptr<Socket> socket, int numberBytes, bool& success)
+{
+   if (numberBytes < MAX_STACK_BUFFER_SIZE) {
+      char stackBuffer[MAX_STACK_BUFFER_SIZE];
+      memset(stackBuffer, 0, MAX_STACK_BUFFER_SIZE);
+      
+      if (socket->readSocket(stackBuffer, numberBytes)) {
+         stackBuffer[numberBytes] = '\0';
+         success = true;
+         return std::string(stackBuffer);
+      } else {
+         Logger::error("reading socket for header failed");
+         success = false;
+         return "";
+      }
+   } else {
+      if (numberBytes <= MAX_SEGMENT_LENGTH) {
+         std::string returnValue;
+         char* heapBuffer = new char[numberBytes+1];
+         memset(heapBuffer, 0, numberBytes+1);
+         if (socket->readSocket(heapBuffer, numberBytes)) {
+            heapBuffer[numberBytes] = '\0';
+            success = true;
+            returnValue = heapBuffer;
+         } else {
+            Logger::error("reading socket for header failed");
+            success = false;
+         }
+         
+         delete [] heapBuffer;
+         
+         return returnValue;
+      } else {
+         Logger::error("header length exceeds 32K");
+         success = false;
+         return "";
+      }
+   }   
+}
+
+//******************************************************************************
    
 bool Message::reconstitute(std::shared_ptr<Socket> socket)
 {
    if (socket != nullptr) {
+      
       char headerLengthPrefixBuffer[11];
       memset(headerLengthPrefixBuffer, 0, NUM_CHARS_HEADER_LENGTH+1);
       
@@ -325,42 +368,9 @@ bool Message::reconstitute(std::shared_ptr<Socket> socket)
          const std::size_t headerLength = std::atol(headerLengthPrefix.c_str());
          
          if (headerLength > 0) {
-            char stackBuffer[MAX_STACK_BUFFER_SIZE];
-            bool stackBufferZeroed = false;
             bool headerRead = false;
-            std::string headerAsString;
-            
-            if (headerLength < MAX_STACK_BUFFER_SIZE) {
-               memset(stackBuffer, 0, MAX_STACK_BUFFER_SIZE);
-               stackBufferZeroed = true;
-               
-               if (socket->readSocket(stackBuffer, headerLength)) {
-                  stackBuffer[headerLength] = '\0';
-                  headerRead = true;
-                  headerAsString = stackBuffer;
-               } else {
-                  Logger::error("reading socket for header failed");
-                  return false;
-               }
-            } else {
-               if (headerLength <= MAX_SEGMENT_LENGTH) {
-                  char* heapBuffer = new char[headerLength+1];
-                  memset(heapBuffer, 0, headerLength+1);
-                  if (socket->readSocket(heapBuffer, headerLength)) {
-                     heapBuffer[headerLength] = '\0';
-                     headerRead = true;
-                     headerAsString = heapBuffer;
-                  } else {
-                     delete [] heapBuffer;
-                     Logger::error("reading socket for header failed");
-                     return false;
-                  }
-                  delete [] heapBuffer;
-               } else {
-                  Logger::error("header length exceeds 32K");
-                  return false;
-               }
-            }
+            std::string headerAsString =
+               readSocketBytes(socket, headerLength, headerRead);
             
             if (headerRead && !headerAsString.empty()) {
                if (fromString(headerAsString, m_kvpHeaders)) {
@@ -387,38 +397,8 @@ bool Message::reconstitute(std::shared_ptr<Socket> socket)
                         
                         if (payloadLength > 0) {
                            bool payloadRead = false;
-                           std::string payloadAsString;
-                           
-                           if (payloadLength < MAX_STACK_BUFFER_SIZE) {
-                              memset(stackBuffer, 0, MAX_STACK_BUFFER_SIZE);
-                              
-                              if (socket->readSocket(stackBuffer, payloadLength)) {
-                                 stackBuffer[payloadLength] = '\0';
-                                 payloadRead = true;
-                                 payloadAsString = stackBuffer;
-                              } else {
-                                 Logger::error("reading socket for payload failed");
-                                 return false;
-                              }
-                           } else {
-                              if (payloadLength <= MAX_SEGMENT_LENGTH) {
-                                 char* heapBuffer = new char[payloadLength];
-                                 memset(heapBuffer, 0, payloadLength);
-                                 if (socket->readSocket(heapBuffer, payloadLength)) {
-                                    heapBuffer[payloadLength] = '\0';
-                                    payloadRead = true;
-                                    payloadAsString = heapBuffer;
-                                 } else {
-                                    delete [] heapBuffer;
-                                    Logger::error("reading socket for payload failed");
-                                    return false;
-                                 }
-                                 delete [] heapBuffer;
-                              } else {
-                                 Logger::error("payload length exceeds 32K");
-                                 return false;
-                              }
-                           }
+                           std::string payloadAsString =
+                              readSocketBytes(socket, payloadLength, payloadRead);
                            
                            if (payloadRead && !payloadAsString.empty()) {
                               if (m_messageType == MessageType::Text) {

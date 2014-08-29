@@ -227,6 +227,10 @@ public:
     */
    const std::string& getHeader(const std::string& key) const;
    
+   std::string readSocketBytes(std::shared_ptr<chaudiere::Socket> socket,
+                               int numberBytes,
+                               bool& success);
+   
 private:
    std::string m_serviceName;
    std::string m_textPayload;
