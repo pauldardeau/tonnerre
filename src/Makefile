@@ -2,7 +2,7 @@
 # BSD License
 
 CC = clang++
-CC_OPTS = -c -O2 -std=c++11 -I../../chaudiere/src
+CC_OPTS = -c -Wall -O2 -std=c++11 -I../../chaudiere/src
 ARCHIVE_CMD = ar
 ARCHIVE_OPTS = rs
 
