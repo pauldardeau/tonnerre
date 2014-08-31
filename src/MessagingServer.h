@@ -37,7 +37,7 @@ public:
    /**
     * Destructor
     */
-   ~MessagingServer();
+   ~MessagingServer() noexcept;
    
    /**
     * Sets the message handler

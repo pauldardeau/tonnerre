@@ -28,7 +28,7 @@ MessagingServer::MessagingServer(const std::string& configFilePath,
 
 //******************************************************************************
 
-MessagingServer::~MessagingServer()
+MessagingServer::~MessagingServer() noexcept
 {
    Logger::logInstanceDestroy("MessagingServer");
 }
