@@ -44,13 +44,15 @@ public:
     */
    static bool isInitialized();
    
+   /**
+    * Default constructor
+    */
    Messaging();
-   ~Messaging();
    
-   Messaging(const Messaging&) = delete;
-   Messaging(Messaging&&) = delete;
-   Messaging& operator=(const Messaging&) = delete;
-   Messaging& operator=(Messaging&&) = delete;
+   /**
+    * Destructor
+    */
+   ~Messaging();
    
    /**
     * Registers a service with its name and host/port values
@@ -75,11 +77,30 @@ public:
     */
    const chaudiere::ServiceInfo& getInfoForService(const std::string& serviceName) const;
    
+   /**
+    * Retrieve a socket connection for the specified service
+    * @param serviceInfo the service for which a socket conection is desired
+    * @return socket connection
+    * @see ServiceInfo()
+    * @see Socket()
+    */
    std::shared_ptr<chaudiere::Socket> socketForService(const chaudiere::ServiceInfo& serviceInfo);
 
+   /**
+    * Returns socket connection back to pool for reuse
+    * @param serviceInfo the service whose socket connection is being returned to pool
+    * @param socket the socket connection being returned to the pool
+    * @see ServiceInfo()
+    * @see Socket()
+    */
    void returnSocketForService(const chaudiere::ServiceInfo& serviceInfo,
                                std::shared_ptr<chaudiere::Socket> socket);
 
+
+   Messaging(const Messaging&) = delete;
+   Messaging(Messaging&&) = delete;
+   Messaging& operator=(const Messaging&) = delete;
+   Messaging& operator=(Messaging&&) = delete;
 
 private:
    static std::shared_ptr<Messaging> messagingInstance;
