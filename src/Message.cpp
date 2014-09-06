@@ -325,7 +325,7 @@ std::string Message::readSocketBytes(std::shared_ptr<Socket> socket, int numberB
       } else {
          Logger::error("reading socket for header failed");
          success = false;
-         return "";
+         return EMPTY_STRING;
       }
    } else {
       if (numberBytes <= MAX_SEGMENT_LENGTH) {
@@ -347,7 +347,7 @@ std::string Message::readSocketBytes(std::shared_ptr<Socket> socket, int numberB
       } else {
          Logger::error("header length exceeds 32K");
          success = false;
-         return "";
+         return EMPTY_STRING;
       }
    }   
 }
@@ -382,6 +382,8 @@ bool Message::reconstitute(std::shared_ptr<Socket> socket)
                         m_messageType = MessageType::Text;
                      } else if (valuePayloadType == VALUE_PAYLOAD_KVP) {
                         m_messageType = MessageType::KeyValues;
+                     } else {
+                        Logger::error("unrecognized payload type");
                      }
                   }
                   
@@ -469,7 +471,7 @@ std::string Message::toString() const
    if (m_kvpHeaders.hasKey(KEY_REQUEST_NAME)) {
       kvpHeaders.addPair(KEY_REQUEST_NAME, m_kvpHeaders.getValue(KEY_REQUEST_NAME));
    } else {
-      kvpHeaders.addPair(KEY_REQUEST_NAME, "");
+      kvpHeaders.addPair(KEY_REQUEST_NAME, EMPTY_STRING);
    }
 
    const std::size_t payloadLength = payload.length();
