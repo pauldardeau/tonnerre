@@ -32,7 +32,7 @@ MessageRequestHandler::MessageRequestHandler(std::shared_ptr<SocketRequest> sock
 
 //******************************************************************************
 
-MessageRequestHandler::~MessageRequestHandler()
+MessageRequestHandler::~MessageRequestHandler() noexcept
 {
    Logger::logInstanceDestroy("MessageRequestHandler");
 }

@@ -38,7 +38,7 @@ public:
    /**
     * Destructor
     */
-   ~MessageRequestHandler();
+   ~MessageRequestHandler() noexcept;
    
    /**
     *
