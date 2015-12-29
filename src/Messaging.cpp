@@ -100,12 +100,12 @@ Messaging::Messaging() :
    m_mutex(NULL) {
    ThreadingFactory* factory = ThreadingFactory::getThreadingFactory();
    if (factory == NULL) {
-      factory = new PthreadsThreadingFactory;
-      //factory = new StdThreadingFactory;
+      //factory = new PthreadsThreadingFactory;
+      factory = new StdThreadingFactory;
       ThreadingFactory::setThreadingFactory(factory);
    }
   
-   m_mutex = factory->createMutex();
+   m_mutex = factory->createMutex("messaging");
 }
 
 //******************************************************************************
