@@ -31,7 +31,7 @@ void PrintKeyValues(const KeyValuePairs& kvp)
 
 int main(int argc, char* argv[])
 {
-   std::shared_ptr<StdLogger> logger(new StdLogger(Logger::LogLevel::Info));
+   StdLogger* logger(new StdLogger(Logger::LogLevel::Info));
    //logger->setLogInstanceLifecycles(true);
    Logger::setLogger(logger);
    

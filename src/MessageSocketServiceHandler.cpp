@@ -16,31 +16,28 @@ const std::string MessageSocketServiceHandler::handlerName = "MessageSocketServi
 //******************************************************************************
 
 MessageSocketServiceHandler::MessageSocketServiceHandler(MessageHandler* handler) :
-   m_handler(handler)
-{
+   m_handler(handler) {
    Logger::logInstanceCreate("MessageSocketServiceHandler");
 }
 
 //******************************************************************************
 
-MessageSocketServiceHandler::~MessageSocketServiceHandler()
-{
+MessageSocketServiceHandler::~MessageSocketServiceHandler() {
    Logger::logInstanceDestroy("MessageSocketServiceHandler");
 }
 
 //******************************************************************************
 
-void MessageSocketServiceHandler::serviceSocket(std::shared_ptr<SocketRequest> socketRequest)
-{
+void MessageSocketServiceHandler::serviceSocket(SocketRequest* socketRequest) {
    MessageRequestHandler messageRequestHandler(socketRequest, m_handler);
    messageRequestHandler.run();
 }
 
 //******************************************************************************
 
-const std::string& MessageSocketServiceHandler::getName() const
-{
+const std::string& MessageSocketServiceHandler::getName() const {
    return handlerName;
 }
 
 //******************************************************************************
+

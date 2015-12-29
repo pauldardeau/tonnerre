@@ -24,13 +24,13 @@ public:
     * Establishes a Messaging instance as the singleton for messaging
     * @param messaging the Messaging object instance for messaging
     */
-   static void setMessaging(std::shared_ptr<Messaging> messaging) noexcept;
+   static void setMessaging(Messaging* messaging) noexcept;
    
    /**
     * Retrieves the Messaging singleton instance
     * @return pointer to the Messaging instance, or nullptr if not initialized
     */
-   static std::shared_ptr<Messaging> getMessaging() noexcept;
+   static Messaging* getMessaging() noexcept;
    
    /**
     * Initializes the messaging system by reading the configuration file and creating a Messaging instance
@@ -84,7 +84,7 @@ public:
     * @see ServiceInfo()
     * @see Socket()
     */
-   std::shared_ptr<chaudiere::Socket> socketForService(const chaudiere::ServiceInfo& serviceInfo);
+   chaudiere::Socket* socketForService(const chaudiere::ServiceInfo& serviceInfo);
 
    /**
     * Returns socket connection back to pool for reuse
@@ -94,7 +94,7 @@ public:
     * @see Socket()
     */
    void returnSocketForService(const chaudiere::ServiceInfo& serviceInfo,
-                               std::shared_ptr<chaudiere::Socket> socket);
+                               chaudiere::Socket* socket);
 
 
    Messaging(const Messaging&) = delete;
@@ -103,12 +103,13 @@ public:
    Messaging& operator=(Messaging&&) = delete;
 
 private:
-   static std::shared_ptr<Messaging> messagingInstance;
+   static Messaging* messagingInstance;
    std::unordered_map<std::string, chaudiere::ServiceInfo> m_mapServices;
-   std::unordered_map<std::string, std::shared_ptr<chaudiere::Socket>> m_mapSocketConnections;
-   std::shared_ptr<chaudiere::Mutex> m_mutex;
+   std::unordered_map<std::string, chaudiere::Socket*> m_mapSocketConnections;
+   chaudiere::Mutex* m_mutex;
 };
 
 }
 
 #endif
+

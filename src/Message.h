@@ -34,7 +34,7 @@ public:
     * @return a new Message object instance constructed by reading data from socket
     * @see Socket()
     */
-   static std::shared_ptr<Message> reconstruct(std::shared_ptr<chaudiere::Socket> socket);
+   static Message* reconstruct(chaudiere::Socket* socket);
    
    /**
     * Default constructor (used internally)
@@ -53,12 +53,6 @@ public:
     * @param copy the source of the copy construction
     */
    Message(const Message& copy);
-   
-   /**
-    * Move constructor
-    * @param move the source of the move construction
-    */
-   Message(Message&& move);
    
    /**
     * Destructor
@@ -89,19 +83,12 @@ public:
    Message& operator=(const Message& copy);
    
    /**
-    * Move operator
-    * @param move the source of the move
-    * @return reference to the target of the move
-    */
-   Message& operator=(Message&& move);
-   
-   /**
     * Reconstitute a message by reading message state data from a socket (used internally)
     * @param socket the socket from which to read message state data
     * @return boolean indicating whether the message was successfully reconstituted
     * @see Socket()
     */
-   bool reconstitute(std::shared_ptr<chaudiere::Socket> socket);
+   bool reconstitute(chaudiere::Socket* socket);
    
    /**
     * Sets the type of the message
@@ -188,14 +175,14 @@ public:
     * @return the decoded length of the message header
     * @see Socket()
     */
-   static std::size_t decodeLength(std::shared_ptr<chaudiere::Socket> socket);
+   static std::size_t decodeLength(chaudiere::Socket* socket);
    
    /**
     * Retrieves a socket connection for the specified service (used internally)
     * @param serviceName the name of the service whose connection is needed
     * @return a Socket instance on success, nullptr on failure
     */
-   std::shared_ptr<chaudiere::Socket> socketForService(const std::string& serviceName) const;
+   chaudiere::Socket* socketForService(const std::string& serviceName) const;
 
    /**
     *
@@ -203,7 +190,7 @@ public:
     * @param socket
     */
    void returnSocketForService(const std::string& serviceName,
-                               std::shared_ptr<chaudiere::Socket> socket);
+                               chaudiere::Socket* socket);
                                
    /**
     * Sets the specified key/value pair in the headers
@@ -227,7 +214,7 @@ public:
     */
    const std::string& getHeader(const std::string& key) const;
    
-   std::string readSocketBytes(std::shared_ptr<chaudiere::Socket> socket,
+   std::string readSocketBytes(chaudiere::Socket* socket,
                                int numberBytes,
                                bool& success);
    
@@ -245,3 +232,4 @@ private:
 }
 
 #endif
+

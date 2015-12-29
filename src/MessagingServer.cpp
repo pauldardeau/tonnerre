@@ -21,44 +21,39 @@ MessagingServer::MessagingServer(const std::string& configFilePath,
                                  MessageHandler* handler) :
    SocketServer(SERVER_NAME, SERVER_VERSION, configFilePath),
    m_handler(handler),
-   m_serviceName(serverServiceName)
-{
+   m_serviceName(serverServiceName) {
    Logger::logInstanceCreate("MessagingServer");
 }
 
 //******************************************************************************
 
-MessagingServer::~MessagingServer() noexcept
-{
+MessagingServer::~MessagingServer() noexcept {
    Logger::logInstanceDestroy("MessagingServer");
 }
 
 //******************************************************************************
 
-void MessagingServer::setMessageHandler(MessageHandler* handler)
-{
+void MessagingServer::setMessageHandler(MessageHandler* handler) {
    m_handler = handler;
 }
 
 //******************************************************************************
 
-std::shared_ptr<RequestHandler> MessagingServer::handlerForSocket(std::shared_ptr<Socket> socket)
-{
-   return std::shared_ptr<RequestHandler>(new MessageRequestHandler(socket, m_handler));
+RequestHandler* MessagingServer::handlerForSocket(Socket* socket) {
+   return new MessageRequestHandler(socket, m_handler);
 }
 
 //******************************************************************************
 
-std::shared_ptr<RequestHandler> MessagingServer::handlerForSocketRequest(std::shared_ptr<SocketRequest> socketRequest)
-{
-   return std::shared_ptr<RequestHandler>(new MessageRequestHandler(socketRequest, m_handler));
+RequestHandler* MessagingServer::handlerForSocketRequest(SocketRequest* socketRequest) {
+   return new MessageRequestHandler(socketRequest, m_handler);
 }
 
 //******************************************************************************
 
-std::shared_ptr<SocketServiceHandler> MessagingServer::createSocketServiceHandler()
-{
-   return std::shared_ptr<SocketServiceHandler>(new MessageSocketServiceHandler(m_handler));
+SocketServiceHandler* MessagingServer::createSocketServiceHandler() {
+   return new MessageSocketServiceHandler(m_handler);
 }
 
 //******************************************************************************
+

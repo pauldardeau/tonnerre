@@ -38,13 +38,13 @@ using namespace tonnerre;
 
 //******************************************************************************
 
-std::shared_ptr<tonnerre::Message> Message::reconstruct(std::shared_ptr<Socket> socket)
-{
-   std::shared_ptr<Message> message(new Message());
+tonnerre::Message* Message::reconstruct(Socket* socket) {
+   Message* message(new Message());
    if (message->reconstitute(socket)) {
       return message;
    } else {
-      return nullptr;
+      delete message;
+      return NULL;
    }
 }
 
@@ -53,8 +53,7 @@ std::shared_ptr<tonnerre::Message> Message::reconstruct(std::shared_ptr<Socket> 
 Message::Message() :
    m_messageType(MessageType::Unknown),
    m_isOneWay(false),
-   m_persistentConnection(false)
-{
+   m_persistentConnection(false) {
    Logger::logInstanceCreate("Message");
 }
 
@@ -63,8 +62,7 @@ Message::Message() :
 Message::Message(const std::string& requestName, MessageType messageType) :
    m_messageType(messageType),
    m_isOneWay(false),
-   m_persistentConnection(false)
-{
+   m_persistentConnection(false) {
    Logger::logInstanceCreate("Message");
    m_kvpHeaders.addPair(KEY_REQUEST_NAME, requestName);
 }
@@ -78,29 +76,13 @@ Message::Message(const Message& copy) :
    m_kvpHeaders(copy.m_kvpHeaders),
    m_messageType(copy.m_messageType),
    m_isOneWay(copy.m_isOneWay),
-   m_persistentConnection(false)
-{
+   m_persistentConnection(false) {
    Logger::logInstanceCreate("Message");
 }
 
 //******************************************************************************
 
-Message::Message(Message&& move) :
-   m_serviceName(std::move(move.m_serviceName)),
-   m_textPayload(std::move(move.m_textPayload)),
-   m_kvpPayload(std::move(move.m_kvpPayload)),
-   m_kvpHeaders(std::move(move.m_kvpHeaders)),
-   m_messageType(move.m_messageType),
-   m_isOneWay(move.m_isOneWay),
-   m_persistentConnection(false)
-{
-   Logger::logInstanceCreate("Message");
-}
-
-//******************************************************************************
-
-Message::~Message()
-{
+Message::~Message() {
    Logger::logInstanceDestroy("Message");
 }
 
@@ -125,35 +107,15 @@ Message& Message::operator=(const Message& copy)
 
 //******************************************************************************
 
-Message& Message::operator=(Message&& move)
-{
-   if (this == &move) {
-      return *this;
-   }
-   
-   m_serviceName = std::move(move.m_serviceName);
-   m_textPayload = std::move(move.m_textPayload);
-   m_kvpPayload = std::move(move.m_kvpPayload);
-   m_kvpHeaders = std::move(move.m_kvpHeaders);
-   m_messageType = move.m_messageType;
-   m_isOneWay = move.m_isOneWay;
-   m_persistentConnection = false;
-   
-   return *this;
-}
-
-//******************************************************************************
-
-bool Message::send(const std::string& serviceName)
-{
+bool Message::send(const std::string& serviceName) {
    if (m_messageType == MessageType::Unknown) {
       Logger::error("unable to send message, no message type set");
       return false;
    }
 
-   std::shared_ptr<Socket> socket(socketForService(serviceName));
+   Socket* socket = socketForService(serviceName);
    
-   if (socket != nullptr) {
+   if (socket != NULL) {
       m_isOneWay = true;
       
       if (socket->write(toString())) {
@@ -167,7 +129,7 @@ bool Message::send(const std::string& serviceName)
       returnSocketForService(serviceName, socket);
    } else {
       // unable to connect to service
-      Logger::error("unable to connect to service");
+      Logger::error("unable to connect to service (socketForService returned NULL)");
    }
    
    return false;
@@ -175,16 +137,15 @@ bool Message::send(const std::string& serviceName)
 
 //******************************************************************************
 
-bool Message::send(const std::string& serviceName, Message& responseMessage)
-{
+bool Message::send(const std::string& serviceName, Message& responseMessage) {
    if (m_messageType == MessageType::Unknown) {
       Logger::error("unable to send message, no message type set");
       return false;
    }
    
-   std::shared_ptr<Socket> socket(socketForService(serviceName));
+   Socket* socket(socketForService(serviceName));
    
-   if (socket != nullptr) {
+   if (socket != NULL) {
       //const std::string payload = toString();
       //printf("payload: '%s'\n", payload.c_str());
       
@@ -208,50 +169,43 @@ bool Message::send(const std::string& serviceName, Message& responseMessage)
 
 //******************************************************************************
 
-Message::MessageType Message::getType() const
-{
+Message::MessageType Message::getType() const {
    return m_messageType;
 }
 
 //******************************************************************************
 
-const KeyValuePairs& Message::getKeyValuesPayload() const
-{
+const KeyValuePairs& Message::getKeyValuesPayload() const {
    return m_kvpPayload;
 }
 
 //******************************************************************************
 
-const std::string& Message::getTextPayload() const
-{
+const std::string& Message::getTextPayload() const {
    return m_textPayload;
 }
 
 //******************************************************************************
 
-void Message::setKeyValuesPayload(const KeyValuePairs& kvp)
-{
+void Message::setKeyValuesPayload(const KeyValuePairs& kvp) {
    m_kvpPayload = kvp;
 }
 
 //******************************************************************************
 
-void Message::setTextPayload(const std::string& text)
-{
+void Message::setTextPayload(const std::string& text) {
    m_textPayload = text;
 }
 
 //******************************************************************************
 
-const std::string& Message::getServiceName() const
-{
+const std::string& Message::getServiceName() const {
    return m_serviceName;
 }
 
 //******************************************************************************
 
-std::string Message::getRequestName() const
-{
+std::string Message::getRequestName() const {
    if (m_kvpHeaders.hasKey(KEY_REQUEST_NAME)) {
       return std::string(m_kvpHeaders.getValue(KEY_REQUEST_NAME));
    } else {
@@ -261,22 +215,26 @@ std::string Message::getRequestName() const
 
 //******************************************************************************
 
-std::shared_ptr<Socket> Message::socketForService(const std::string& serviceName) const
-{
-   std::shared_ptr<Messaging> messaging(Messaging::getMessaging());
+Socket* Message::socketForService(const std::string& serviceName) const {
+   Messaging* messaging = Messaging::getMessaging();
    
-   if (messaging != nullptr) {
+   if (messaging != NULL) {
       if (messaging->isServiceRegistered(serviceName)) {
          const ServiceInfo& serviceInfo = messaging->getInfoForService(serviceName);
          //const std::string& host = serviceInfo.host();
          //const unsigned short port = serviceInfo.port();
          const bool persistentConnection = serviceInfo.getPersistentConnection();
-         std::shared_ptr<Socket> socket = nullptr;
+
+         Socket* socket = NULL;
             
          if (persistentConnection) {
+            printf("persistent connection set true\n");
             m_persistentConnection = true;
             socket =
-               std::shared_ptr<Socket>(messaging->socketForService(serviceInfo));
+               messaging->socketForService(serviceInfo);
+         } else {
+            printf("persistent connection set false\n");
+            socket = messaging->socketForService(serviceInfo);
          }
             
          return socket;
@@ -287,18 +245,17 @@ std::shared_ptr<Socket> Message::socketForService(const std::string& serviceName
       Logger::error("messaging not initialized");
    }
    
-   return nullptr;
+   return NULL;
 }
 
 //******************************************************************************
 
 void Message::returnSocketForService(const std::string& serviceName,
-                                     std::shared_ptr<chaudiere::Socket> socket)
-{
+                                     chaudiere::Socket* socket) {
    if (m_persistentConnection) {
-      if (!serviceName.empty() && (socket != nullptr)) {
-         std::shared_ptr<Messaging> messaging(Messaging::getMessaging());
-         if (messaging != nullptr) {
+      if (!serviceName.empty() && (socket != NULL)) {
+         Messaging* messaging(Messaging::getMessaging());
+         if (messaging != NULL) {
             if (messaging->isServiceRegistered(serviceName)) {
                const ServiceInfo& serviceInfo = messaging->getInfoForService(serviceName);
                if (serviceInfo.getPersistentConnection()) {
@@ -312,8 +269,7 @@ void Message::returnSocketForService(const std::string& serviceName,
 
 //******************************************************************************
 
-std::string Message::readSocketBytes(std::shared_ptr<Socket> socket, int numberBytes, bool& success)
-{
+std::string Message::readSocketBytes(Socket* socket, int numberBytes, bool& success) {
    if (numberBytes < MAX_STACK_BUFFER_SIZE) {
       char stackBuffer[MAX_STACK_BUFFER_SIZE];
       memset(stackBuffer, 0, MAX_STACK_BUFFER_SIZE);
@@ -354,9 +310,8 @@ std::string Message::readSocketBytes(std::shared_ptr<Socket> socket, int numberB
 
 //******************************************************************************
    
-bool Message::reconstitute(std::shared_ptr<Socket> socket)
-{
-   if (socket != nullptr) {
+bool Message::reconstitute(Socket* socket) {
+   if (socket != NULL) {
       
       char headerLengthPrefixBuffer[11];
       memset(headerLengthPrefixBuffer, 0, NUM_CHARS_HEADER_LENGTH+1);
@@ -405,7 +360,7 @@ bool Message::reconstitute(std::shared_ptr<Socket> socket)
                            
                            if (payloadRead && !payloadAsString.empty()) {
                               if (m_messageType == MessageType::Text) {
-                                 m_textPayload = std::move(payloadAsString);
+                                 m_textPayload = payloadAsString;
                               } else if (m_messageType == MessageType::KeyValues) {
                                  fromString(payloadAsString, m_kvpPayload);
                               }
@@ -449,8 +404,7 @@ bool Message::reconstitute(std::shared_ptr<Socket> socket)
 
 //******************************************************************************
 
-std::string Message::toString() const
-{
+std::string Message::toString() const {
    KeyValuePairs kvpHeaders(m_kvpHeaders);
    std::string payload;
    
@@ -492,8 +446,7 @@ std::string Message::toString() const
 
 //******************************************************************************
 
-std::string Message::toString(const KeyValuePairs& kvp)
-{
+std::string Message::toString(const KeyValuePairs& kvp) {
    std::string kvpAsString;
    
    if (!kvp.empty()) {
@@ -520,8 +473,7 @@ std::string Message::toString(const KeyValuePairs& kvp)
 
 //******************************************************************************
 
-bool Message::fromString(const std::string& s, KeyValuePairs& kvp)
-{
+bool Message::fromString(const std::string& s, KeyValuePairs& kvp) {
    int numPairsAdded = 0;
    
    if (!s.empty()) {
@@ -549,8 +501,7 @@ bool Message::fromString(const std::string& s, KeyValuePairs& kvp)
 
 //******************************************************************************
 
-std::string Message::encodeLength(std::size_t lengthBytes)
-{
+std::string Message::encodeLength(std::size_t lengthBytes) {
    char lengthAsChars[11];
    memset(lengthAsChars, 0, NUM_CHARS_HEADER_LENGTH+1);
    snprintf(lengthAsChars, NUM_CHARS_HEADER_LENGTH, "%lu", lengthBytes);
@@ -559,11 +510,10 @@ std::string Message::encodeLength(std::size_t lengthBytes)
 
 //******************************************************************************
 
-std::size_t Message::decodeLength(std::shared_ptr<Socket> socket)
-{
+std::size_t Message::decodeLength(Socket* socket) {
    std::size_t lengthBytes = 0;
    
-   if (socket != nullptr) {
+   if (socket != NULL) {
       char lengthAsChars[11];
       memset(lengthAsChars, 0, NUM_CHARS_HEADER_LENGTH+1);
       if (socket->read(lengthAsChars, NUM_CHARS_HEADER_LENGTH)) {
@@ -576,23 +526,21 @@ std::size_t Message::decodeLength(std::shared_ptr<Socket> socket)
 
 //******************************************************************************
 
-void Message::setHeader(const std::string& key, const std::string& value)
-{
+void Message::setHeader(const std::string& key, const std::string& value) {
    m_kvpHeaders.addPair(key, value);
 }
 
 //******************************************************************************
 
-bool Message::hasHeader(const std::string& key) const
-{
+bool Message::hasHeader(const std::string& key) const {
    return m_kvpHeaders.hasKey(key);
 }
 
 //******************************************************************************
 
-const std::string& Message::getHeader(const std::string& key) const
-{
+const std::string& Message::getHeader(const std::string& key) const {
    return m_kvpHeaders.getValue(key);
 }
 
 //******************************************************************************
+

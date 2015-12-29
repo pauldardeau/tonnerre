@@ -14,39 +14,35 @@ using namespace chaudiere;
 
 //******************************************************************************
 
-MessageRequestHandler::MessageRequestHandler(std::shared_ptr<Socket> socket, MessageHandler* handler) :
+MessageRequestHandler::MessageRequestHandler(Socket* socket, MessageHandler* handler) :
    RequestHandler(socket),
-   m_handler(handler)
-{
+   m_handler(handler) {
    Logger::logInstanceCreate("MessageRequestHandler");
 }
 
 //******************************************************************************
 
-MessageRequestHandler::MessageRequestHandler(std::shared_ptr<SocketRequest> socketRequest, MessageHandler* handler) :
+MessageRequestHandler::MessageRequestHandler(SocketRequest* socketRequest, MessageHandler* handler) :
    RequestHandler(socketRequest),
-   m_handler(handler)
-{
+   m_handler(handler) {
    Logger::logInstanceCreate("MessageRequestHandler");
 }
 
 //******************************************************************************
 
-MessageRequestHandler::~MessageRequestHandler() noexcept
-{
+MessageRequestHandler::~MessageRequestHandler() noexcept {
    Logger::logInstanceDestroy("MessageRequestHandler");
 }
 
 //******************************************************************************
 
-void MessageRequestHandler::run()
-{
-   std::shared_ptr<Socket> socket(getSocket());
+void MessageRequestHandler::run() {
+   Socket* socket(getSocket());
    MessageHandler* messageHandler = m_handler;
    
-   if ((socket != nullptr) && (messageHandler != nullptr)) {
-      std::shared_ptr<Message> requestMessage(Message::reconstruct(socket));
-      if (requestMessage != nullptr) {
+   if ((socket != NULL) && (messageHandler != NULL)) {
+      Message* requestMessage(Message::reconstruct(socket));
+      if (requestMessage != NULL) {
          const std::string& requestName = requestMessage->getRequestName();
          if (!requestName.empty()) {
             const Message::MessageType messageType = requestMessage->getType();
@@ -61,19 +57,13 @@ void MessageRequestHandler::run()
                                                          requestMessage->getKeyValuesPayload(),
                                                          responsePayload);
                   responseMessage.setKeyValuesPayload(responsePayload);
-               }
-               catch (const BasicException& be) 
-               {
+               } catch (const BasicException& be) {
                   // BasicException caught
                   Logger::error("execption caught in handling message: " + be.whatString());
-               }
-               catch (const std::exception& e)
-               {
+               } catch (const std::exception& e) {
                   // exception caught
                   Logger::error("exception caught in handling message: " + std::string(e.what()));
-               }
-               catch (...)
-               {
+               } catch (...) {
                   // unknown exception caught
                   Logger::error("exception caught in handling message");
                }
@@ -87,19 +77,13 @@ void MessageRequestHandler::run()
                                                     requestMessage->getTextPayload(),
                                                     responsePayload);
                   responseMessage.setTextPayload(responsePayload);
-               }
-               catch (const BasicException& be) 
-               {
+               } catch (const BasicException& be) {
                   // BasicException caught
                   Logger::error("execption caught in handling message: " + be.whatString());
-               }
-               catch (const std::exception& e)
-               {
+               } catch (const std::exception& e) {
                   // exception caught
                   Logger::error("exception caught in handling message: " + std::string(e.what()));
-               }
-               catch (...)
-               {
+               } catch (...) {
                   // unknown exception caught
                   Logger::error("exception caught in handling message");
                }
@@ -118,14 +102,15 @@ void MessageRequestHandler::run()
          Logger::error("unable to reconstruct request message");
       }
    } else {
-      if (socket == nullptr) {
+      if (socket == NULL) {
          Logger::error("no socket provided");
       }
       
-      if (messageHandler == nullptr) {
+      if (messageHandler == NULL) {
          Logger::error("no message handler provided");
       }
    }
 }
 
 //******************************************************************************
+

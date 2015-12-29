@@ -52,7 +52,7 @@ public:
     * @see RequestHandler()
     * @see Socket()
     */
-   virtual std::shared_ptr<chaudiere::RequestHandler> handlerForSocket(std::shared_ptr<chaudiere::Socket> socket);
+   virtual chaudiere::RequestHandler* handlerForSocket(chaudiere::Socket* socket);
    
   /**
    * Creates a request handler for the SocketRequest (used internally)
@@ -61,14 +61,14 @@ public:
    * @see RequestHandler()
    * @see SocketRequest()
    */
-   virtual std::shared_ptr<chaudiere::RequestHandler> handlerForSocketRequest(std::shared_ptr<chaudiere::SocketRequest> socketRequest);
+   virtual chaudiere::RequestHandler* handlerForSocketRequest(chaudiere::SocketRequest* socketRequest);
 
   /**
    * Creates a socket service handler (used internally)
    * @return a new instance of SocketServiceHandler
    * @see SocketServiceHandler()
    */
-   virtual std::shared_ptr<chaudiere::SocketServiceHandler> createSocketServiceHandler();
+   virtual chaudiere::SocketServiceHandler* createSocketServiceHandler();
    
 private:
    MessageHandler* m_handler;

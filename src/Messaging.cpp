@@ -10,6 +10,8 @@
 #include "KeyValuePairs.h"
 #include "MutexLock.h"
 #include "ThreadingFactory.h"
+#include "PthreadsThreadingFactory.h"
+#include "StdThreadingFactory.h"
 
 using namespace tonnerre;
 using namespace chaudiere;
@@ -22,19 +24,17 @@ static const std::string KEY_SERVICES    = "services";
 static const std::string VALUE_TRUE      = "true";
 
 
-std::shared_ptr<Messaging> Messaging::messagingInstance = nullptr;
+Messaging* Messaging::messagingInstance = NULL;
 
 //******************************************************************************
 
-void Messaging::setMessaging(std::shared_ptr<Messaging> messaging) noexcept
-{
+void Messaging::setMessaging(Messaging* messaging) noexcept {
    messagingInstance = messaging;
 }
 
 //******************************************************************************
 
-std::shared_ptr<Messaging> Messaging::getMessaging() noexcept
-{
+Messaging* Messaging::getMessaging() noexcept {
    return messagingInstance;
 }
 
@@ -51,7 +51,7 @@ void Messaging::initialize(const std::string& configFilePath)
          kvpServices.getKeys(keys);
          int servicesRegistered = 0;
          
-         std::shared_ptr<Messaging> messaging(new Messaging);
+         Messaging* messaging(new Messaging);
          
          for (auto key : keys) {
             const std::string& serviceName = key;
@@ -90,50 +90,45 @@ void Messaging::initialize(const std::string& configFilePath)
 
 //******************************************************************************
 
-bool Messaging::isInitialized()
-{
-   return nullptr != getMessaging();
+bool Messaging::isInitialized() {
+   return NULL != getMessaging();
 }
 
 //******************************************************************************
 
 Messaging::Messaging() :
-   m_mutex(nullptr)
-{
-   std::shared_ptr<ThreadingFactory> factory(ThreadingFactory::getThreadingFactory());
-   if (factory == nullptr) {
-      factory = std::shared_ptr<ThreadingFactory>(new ThreadingFactory(ThreadingFactory::ThreadingPackage::PTHREADS));
+   m_mutex(NULL) {
+   ThreadingFactory* factory = ThreadingFactory::getThreadingFactory();
+   if (factory == NULL) {
+      factory = new PthreadsThreadingFactory;
+      //factory = new StdThreadingFactory;
       ThreadingFactory::setThreadingFactory(factory);
    }
-   
-   m_mutex = std::shared_ptr<Mutex>(factory->createMutex());
+  
+   m_mutex = factory->createMutex();
 }
 
 //******************************************************************************
 
-Messaging::~Messaging()
-{
+Messaging::~Messaging() {
 }
 
 //******************************************************************************
 
 void Messaging::registerService(const std::string& serviceName,
-                                const ServiceInfo& serviceInfo)
-{
+                                const ServiceInfo& serviceInfo) {
    m_mapServices[serviceName] = serviceInfo;
 }
 
 //******************************************************************************
 
-bool Messaging::isServiceRegistered(const std::string& serviceName) const
-{
+bool Messaging::isServiceRegistered(const std::string& serviceName) const {
    return (m_mapServices.find(serviceName) != m_mapServices.end());
 }
 
 //******************************************************************************
 
-const ServiceInfo& Messaging::getInfoForService(const std::string& serviceName) const
-{
+const ServiceInfo& Messaging::getInfoForService(const std::string& serviceName) const {
    auto it = m_mapServices.find(serviceName);
    if (it != m_mapServices.end()) {
       return (*it).second;
@@ -145,29 +140,32 @@ const ServiceInfo& Messaging::getInfoForService(const std::string& serviceName) 
 
 //******************************************************************************
 
-std::shared_ptr<Socket> Messaging::socketForService(const ServiceInfo& serviceInfo)
-{
+Socket* Messaging::socketForService(const ServiceInfo& serviceInfo) {
    const std::string serviceId = serviceInfo.getUniqueIdentifier();
+   printf("serviceId=%s\n", serviceId.c_str());
    MutexLock lock(*m_mutex);
    auto it = m_mapSocketConnections.find(serviceId);
    if (it != m_mapSocketConnections.end()) {
-      std::shared_ptr<Socket> socket = (*it).second;
+      printf("using existing socket\n");
+      Socket* socket = (*it).second;
       m_mapSocketConnections.erase(it);
       return socket;
    } else {
-      return std::unique_ptr<Socket>(new Socket(serviceInfo.host(),
-                                                serviceInfo.port()));
+      std::string host = serviceInfo.host();
+      int port = serviceInfo.port();
+      printf("creating new socket, host=%s, port=%d\n", host.c_str(), port);
+      return new Socket(serviceInfo.host(),
+                        serviceInfo.port());
    }
 }
 
 //******************************************************************************
 
 void Messaging::returnSocketForService(const ServiceInfo& serviceInfo,
-                                       std::shared_ptr<Socket> socket)
-{
+                                       Socket* socket) {
    const std::string serviceId = serviceInfo.getUniqueIdentifier();
    MutexLock lock(*m_mutex);
-   m_mapSocketConnections[serviceId] = std::move(socket);
+   m_mapSocketConnections[serviceId] = socket;
 }
 
 //******************************************************************************

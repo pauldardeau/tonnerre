@@ -24,7 +24,7 @@ public:
     * @see Socket()
     * @see MessageHandler()
     */
-   MessageRequestHandler(std::shared_ptr<chaudiere::Socket> socket, MessageHandler* handler);
+   MessageRequestHandler(chaudiere::Socket* socket, MessageHandler* handler);
    
    /**
     *
@@ -33,7 +33,7 @@ public:
     * @see SocketRequest()
     * @see MessageHandler()
     */
-   MessageRequestHandler(std::shared_ptr<chaudiere::SocketRequest> socketRequest, MessageHandler* handler);
+   MessageRequestHandler(chaudiere::SocketRequest* socketRequest, MessageHandler* handler);
    
    /**
     * Destructor
