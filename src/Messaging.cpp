@@ -41,8 +41,7 @@ Messaging* Messaging::getMessaging() noexcept {
 //******************************************************************************
 
 // throws BasicException
-void Messaging::initialize(const std::string& configFilePath)
-{
+void Messaging::initialize(const std::string& configFilePath) {
    IniReader reader(configFilePath);
    if (reader.hasSection(KEY_SERVICES)) {
       KeyValuePairs kvpServices;
