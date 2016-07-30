@@ -17,15 +17,13 @@ using namespace chaudiere;
 //******************************************************************************
 //******************************************************************************
                                     
-class TestServerInfo : public MessageHandlerAdapter
-{
+class TestServerInfo : public MessageHandlerAdapter {
 public:
    void handleTextMessage(const Message& requestMessage,
                           Message& responseMessage,
                           const std::string& requestName,
                           const std::string& requestPayload,
-                          std::string& responsePayload)
-   {
+                          std::string& responsePayload) {
       if (requestName == "serverInfo") {
          SystemInfo systemInfo;
          if (systemInfo.retrievedSystemInfo()) {
@@ -53,15 +51,13 @@ public:
 //******************************************************************************
 //******************************************************************************
 
-class TestEchoService : public MessageHandlerAdapter
-{
+class TestEchoService : public MessageHandlerAdapter {
 public:
    void handleKeyValuesMessage(const Message& requestMessage,
                                Message& responseMessage,
                                const std::string& requestName,
                                const KeyValuePairs& requestPayload,
-                               KeyValuePairs& responsePayload)
-   {
+                               KeyValuePairs& responsePayload) {
       if (requestName == "echo") {
          responsePayload = requestPayload;
       }                               
@@ -71,15 +67,13 @@ public:
 //******************************************************************************
 //******************************************************************************
 
-class StoogeInfoService : public MessageHandlerAdapter
-{
+class StoogeInfoService : public MessageHandlerAdapter {
 public:
    void handleKeyValuesMessage(const Message& requestMessage,
                                Message& responseMessage,
                                const std::string& requestName,
                                const KeyValuePairs& requestPayload,
-                               KeyValuePairs& responsePayload)
-   {
+                               KeyValuePairs& responsePayload) {
       printf("StoogesInfoServer.handleKeyValuesMessage called\n");
       
       if (requestName == "listStooges") {
@@ -95,8 +89,7 @@ public:
 //******************************************************************************
 //******************************************************************************
 
-int main(int argc, char* argv[])
-{
+int main(int argc, char* argv[]) {
    const std::string SERVICE_SERVER_INFO = "server_info";
    const std::string SERVICE_ECHO        = "echo_service";
    const std::string SERVICE_STOOGE_INFO = "stooge_info_service";
@@ -127,3 +120,4 @@ int main(int argc, char* argv[])
 }
 
 //******************************************************************************
+

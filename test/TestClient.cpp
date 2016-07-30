@@ -17,8 +17,7 @@ using namespace chaudiere;
 
 //******************************************************************************
 
-void PrintKeyValues(const KeyValuePairs& kvp)
-{
+void PrintKeyValues(const KeyValuePairs& kvp) {
    std::vector<std::string> keys;
    kvp.getKeys(keys);
    for (auto key : keys) {
@@ -29,8 +28,7 @@ void PrintKeyValues(const KeyValuePairs& kvp)
 
 //******************************************************************************
 
-int main(int argc, char* argv[])
-{
+int main(int argc, char* argv[]) {
    StdLogger* logger(new StdLogger(Logger::LogLevel::Info));
    //logger->setLogInstanceLifecycles(true);
    Logger::setLogger(logger);
@@ -54,7 +52,8 @@ int main(int argc, char* argv[])
             const std::string& responseText = response.getTextPayload();
             std::printf("response: '%s'\n", responseText.c_str());
          } else {
-            std::printf("error: unable to send message to service '%s'\n", serviceName.c_str());
+            std::printf("error: unable to send message to service '%s'\n",
+                        serviceName.c_str());
          }
       } else if (serviceName == SERVICE_ECHO) {
          KeyValuePairs kvp;
@@ -67,36 +66,35 @@ int main(int argc, char* argv[])
          message.setKeyValuesPayload(kvp);
          Message response;
          if (message.send(serviceName, response)) {
-            const KeyValuePairs& responseKeyValues = response.getKeyValuesPayload();
+            const KeyValuePairs& responseKeyValues =
+               response.getKeyValuesPayload();
             PrintKeyValues(responseKeyValues);
          } else {
-            std::printf("error: unable to send message to service '%s'\n", serviceName.c_str());
+            std::printf("error: unable to send message to service '%s'\n",
+                        serviceName.c_str());
          }
       } else if (serviceName == SERVICE_STOOGE_INFO) {
          Message message("listStooges", Message::MessageType::KeyValues);
          Message response;
          if (message.send(serviceName, response)) {
-            const KeyValuePairs& responseKeyValues = response.getKeyValuesPayload();
+            const KeyValuePairs& responseKeyValues =
+               response.getKeyValuesPayload();
             PrintKeyValues(responseKeyValues);
          } else {
-            std::printf("error: unable to send message to service '%s'\n", serviceName.c_str());
+            std::printf("error: unable to send message to service '%s'\n",
+                        serviceName.c_str());
          }
       } else {
          std::printf("unrecognized serviceName '%s'\n", serviceName.c_str());
       }
-   }
-   catch (const BasicException& be)
-   {
+   } catch (const BasicException& be) {
       std::printf("BasicException caught: '%s'\n", be.whatString().c_str());
-   }
-   catch (const std::exception& e)
-   {
+   } catch (const std::exception& e) {
       std::printf("exception caught: '%s'\n", e.what());
-   }
-   catch (...)
-   {
+   } catch (...) {
       std::printf("unknown exception caught\n");
    }
 }
 
 //******************************************************************************
+
