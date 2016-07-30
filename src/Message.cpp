@@ -88,8 +88,7 @@ Message::~Message() {
 
 //******************************************************************************
 
-Message& Message::operator=(const Message& copy)
-{
+Message& Message::operator=(const Message& copy) {
    if (this == &copy) {
       return *this;
    }
