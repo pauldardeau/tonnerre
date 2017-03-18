@@ -5,11 +5,12 @@
 #define TONNERRE_MESSAGING_H
 
 #include <string>
-#include <unordered_map>
+#include <map>
 
 #include "ServiceInfo.h"
 #include "Socket.h"
 #include "Mutex.h"
+
 
 namespace tonnerre
 {
@@ -24,13 +25,13 @@ public:
     * Establishes a Messaging instance as the singleton for messaging
     * @param messaging the Messaging object instance for messaging
     */
-   static void setMessaging(Messaging* messaging) noexcept;
+   static void setMessaging(Messaging* messaging);
    
    /**
     * Retrieves the Messaging singleton instance
-    * @return pointer to the Messaging instance, or nullptr if not initialized
+    * @return pointer to the Messaging instance, or NULL if not initialized
     */
-   static Messaging* getMessaging() noexcept;
+   static Messaging* getMessaging();
    
    /**
     * Initializes the messaging system by reading the configuration file and creating a Messaging instance
@@ -60,7 +61,8 @@ public:
     * @param serviceInfo the host/port values for the service
     * @see ServiceInfo()
     */
-   void registerService(const std::string& serviceName, const chaudiere::ServiceInfo& serviceInfo);
+   void registerService(const std::string& serviceName,
+                        const chaudiere::ServiceInfo& serviceInfo);
    
    /**
     * Determines if the specified service name has been registered
@@ -97,19 +99,17 @@ public:
                                chaudiere::Socket* socket);
 
 
-   Messaging(const Messaging&) = delete;
-   Messaging(Messaging&&) = delete;
-   Messaging& operator=(const Messaging&) = delete;
-   Messaging& operator=(Messaging&&) = delete;
 
 private:
    static Messaging* messagingInstance;
-   std::unordered_map<std::string, chaudiere::ServiceInfo> m_mapServices;
-   std::unordered_map<std::string, chaudiere::Socket*> m_mapSocketConnections;
+   std::map<std::string, chaudiere::ServiceInfo> m_mapServices;
+   std::map<std::string, chaudiere::Socket*> m_mapSocketConnections;
    chaudiere::Mutex* m_mutex;
+   
+   Messaging(const Messaging&);
+   Messaging& operator=(const Messaging&);
 };
 
 }
 
 #endif
-

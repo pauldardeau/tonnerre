@@ -22,7 +22,8 @@ MessageRequestHandler::MessageRequestHandler(Socket* socket, MessageHandler* han
 
 //******************************************************************************
 
-MessageRequestHandler::MessageRequestHandler(SocketRequest* socketRequest, MessageHandler* handler) :
+MessageRequestHandler::MessageRequestHandler(SocketRequest* socketRequest,
+                                             MessageHandler* handler) :
    RequestHandler(socketRequest),
    m_handler(handler) {
    Logger::logInstanceCreate("MessageRequestHandler");
@@ -30,7 +31,7 @@ MessageRequestHandler::MessageRequestHandler(SocketRequest* socketRequest, Messa
 
 //******************************************************************************
 
-MessageRequestHandler::~MessageRequestHandler() noexcept {
+MessageRequestHandler::~MessageRequestHandler() {
    Logger::logInstanceDestroy("MessageRequestHandler");
 }
 
@@ -45,9 +46,9 @@ void MessageRequestHandler::run() {
       if (requestMessage != NULL) {
          const std::string& requestName = requestMessage->getRequestName();
          if (!requestName.empty()) {
-            const Message::MessageType messageType = requestMessage->getType();
+            const MessageType messageType = requestMessage->getType();
             Message responseMessage(requestName, messageType);
-            if (messageType == Message::MessageType::KeyValues) {
+            if (messageType == MessageTypeKeyValues) {
                KeyValuePairs responsePayload;
                
                try {
@@ -67,7 +68,7 @@ void MessageRequestHandler::run() {
                   // unknown exception caught
                   Logger::error("exception caught in handling message");
                }
-            } else if (messageType == Message::MessageType::Text) {
+            } else if (messageType == MessageTypeText) {
                std::string responsePayload;
                
                try {
@@ -113,4 +114,3 @@ void MessageRequestHandler::run() {
 }
 
 //******************************************************************************
-

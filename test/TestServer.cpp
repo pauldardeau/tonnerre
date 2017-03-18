@@ -1,6 +1,7 @@
 // Copyright Paul Dardeau, SwampBits LLC 2014
 // BSD License
 
+#include <stdio.h>
 #include <string>
 
 #include "MessagingServer.h"
@@ -11,19 +12,22 @@
 #include "Logger.h"
 #include "StdLogger.h"
 
+using namespace std;
 using namespace tonnerre;
 using namespace chaudiere;
 
 //******************************************************************************
 //******************************************************************************
                                     
-class TestServerInfo : public MessageHandlerAdapter {
+class TestServerInfo : public MessageHandlerAdapter
+{
 public:
    void handleTextMessage(const Message& requestMessage,
                           Message& responseMessage,
                           const std::string& requestName,
                           const std::string& requestPayload,
-                          std::string& responsePayload) {
+                          std::string& responsePayload)
+   {
       if (requestName == "serverInfo") {
          SystemInfo systemInfo;
          if (systemInfo.retrievedSystemInfo()) {
@@ -51,13 +55,15 @@ public:
 //******************************************************************************
 //******************************************************************************
 
-class TestEchoService : public MessageHandlerAdapter {
+class TestEchoService : public MessageHandlerAdapter
+{
 public:
    void handleKeyValuesMessage(const Message& requestMessage,
                                Message& responseMessage,
                                const std::string& requestName,
                                const KeyValuePairs& requestPayload,
-                               KeyValuePairs& responsePayload) {
+                               KeyValuePairs& responsePayload)
+   {
       if (requestName == "echo") {
          responsePayload = requestPayload;
       }                               
@@ -67,13 +73,15 @@ public:
 //******************************************************************************
 //******************************************************************************
 
-class StoogeInfoService : public MessageHandlerAdapter {
+class StoogeInfoService : public MessageHandlerAdapter
+{
 public:
    void handleKeyValuesMessage(const Message& requestMessage,
                                Message& responseMessage,
                                const std::string& requestName,
                                const KeyValuePairs& requestPayload,
-                               KeyValuePairs& responsePayload) {
+                               KeyValuePairs& responsePayload)
+   {
       printf("StoogesInfoServer.handleKeyValuesMessage called\n");
       
       if (requestName == "listStooges") {
@@ -89,18 +97,19 @@ public:
 //******************************************************************************
 //******************************************************************************
 
-int main(int argc, char* argv[]) {
-   const std::string SERVICE_SERVER_INFO = "server_info";
-   const std::string SERVICE_ECHO        = "echo_service";
-   const std::string SERVICE_STOOGE_INFO = "stooge_info_service";
+int main(int argc, char* argv[])
+{
+   const string SERVICE_SERVER_INFO = "server_info";
+   const string SERVICE_ECHO        = "echo_service";
+   const string SERVICE_STOOGE_INFO = "stooge_info_service";
 
-   std::string serviceName;
+   string serviceName;
    //serviceName = SERVICE_SERVER_INFO;
    serviceName = SERVICE_ECHO;
    //serviceName = SERVICE_STOOGE_INFO;
-   MessageHandler* handler = nullptr;
+   MessageHandler* handler = NULL;
    
-   StdLogger* logger(new StdLogger(Logger::LogLevel::Info));
+   StdLogger* logger = new StdLogger(Info);
    //logger->setLogInstanceLifecycles(true);
    Logger::setLogger(logger);
    
@@ -112,7 +121,7 @@ int main(int argc, char* argv[]) {
       handler = new StoogeInfoService();
    }
    
-   if (handler != nullptr) {
+   if (handler != NULL) {
       MessagingServer server("tonnerre.ini", serviceName, handler);
       server.run();
       delete handler;
@@ -120,4 +129,3 @@ int main(int argc, char* argv[]) {
 }
 
 //******************************************************************************
-

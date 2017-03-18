@@ -8,6 +8,7 @@
 #include "MessageSocketServiceHandler.h"
 #include "Logger.h"
 
+using namespace std;
 using namespace tonnerre;
 using namespace chaudiere;
 
@@ -27,7 +28,7 @@ MessagingServer::MessagingServer(const std::string& configFilePath,
 
 //******************************************************************************
 
-MessagingServer::~MessagingServer() noexcept {
+MessagingServer::~MessagingServer() {
    Logger::logInstanceDestroy("MessagingServer");
 }
 
@@ -56,4 +57,3 @@ SocketServiceHandler* MessagingServer::createSocketServiceHandler() {
 }
 
 //******************************************************************************
-

@@ -1,12 +1,12 @@
 # Copyright Paul Dardeau, SwampBits LLC 2014
 # BSD License
 
-CC = clang++
-CC_OPTS = -c -pthread -fblocks -std=c++11 -I../src -I../../chaudiere/src
+CC = g++
+CC_OPTS = -c -pthread -I../src -I../../chaudiere/src
 
 CLIENT = TestClient
 SERVER = TestServer
-LIB_NAME = libtonnerre.a
+LIB_NAME = tonnerre.so
 
 CLIENT_OBJS = TestClient.o
 
@@ -20,10 +20,10 @@ clean :
 	rm -f $(SERVER)
 
 $(CLIENT) : $(CLIENT_OBJS)
-	$(CC) -pthread -fblocks $(CLIENT_OBJS) ../src/$(LIB_NAME) ../../chaudiere/src/libchaudiere.a -o $(CLIENT)
+	$(CC) $(CLIENT_OBJS) -o $(CLIENT) ../../chaudiere/src/chaudiere.so ../src/$(LIB_NAME) -lpthread -ldl
 
 $(SERVER) : $(SERVER_OBJS)
-	$(CC) -pthread -fblocks $(SERVER_OBJS) ../src/$(LIB_NAME) ../../chaudiere/src/libchaudiere.a -o $(SERVER)
+	$(CC) $(SERVER_OBJS) -o $(SERVER) ../../chaudiere/src/chaudiere.so ../src/$(LIB_NAME) -lpthread -ldl
 
 %.o : %.cpp
 	$(CC) $(CC_OPTS) $< -o $@

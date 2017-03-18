@@ -1,12 +1,10 @@
 # Copyright Paul Dardeau, SwampBits LLC 2014
 # BSD License
 
-CC = clang++
-CC_OPTS = -c -Wall -O2 -pthread -fblocks -std=c++11 -I../../chaudiere/src
-ARCHIVE_CMD = ar
-ARCHIVE_OPTS = rs
+CC = g++
+CC_OPTS = -c -Wall -shared -fPIC -O2 -I../../chaudiere/src
 
-LIB_NAME = libtonnerre.a
+LIB_NAME = tonnerre.so
 
 OBJS =  Message.o \
 MessageRequestHandler.o \
@@ -21,7 +19,7 @@ clean :
 	rm -f $(LIB_NAME)
 
 $(LIB_NAME) : $(OBJS)
-	$(ARCHIVE_CMD) $(ARCHIVE_OPTS) $(LIB_NAME) $(OBJS)
+	$(CC) -shared -fPIC $(OBJS) -o $(LIB_NAME)
 
 %.o : %.cpp
 	$(CC) $(CC_OPTS) $< -o $@

@@ -11,7 +11,8 @@
 using namespace tonnerre;
 using namespace chaudiere;
 
-const std::string MessageSocketServiceHandler::handlerName = "MessageSocketServiceHandler";
+const std::string MessageSocketServiceHandler::handlerName =
+   "MessageSocketServiceHandler";
 
 //******************************************************************************
 
@@ -40,4 +41,3 @@ const std::string& MessageSocketServiceHandler::getName() const {
 }
 
 //******************************************************************************
-

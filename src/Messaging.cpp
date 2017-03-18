@@ -9,10 +9,9 @@
 #include "InvalidKeyException.h"
 #include "KeyValuePairs.h"
 #include "MutexLock.h"
-#include "ThreadingFactory.h"
 #include "PthreadsThreadingFactory.h"
-#include "StdThreadingFactory.h"
 
+using namespace std;
 using namespace tonnerre;
 using namespace chaudiere;
 
@@ -22,52 +21,58 @@ static const std::string KEY_PORT        = "port";
 static const std::string KEY_SERVICES    = "services";
 
 static const std::string VALUE_TRUE      = "true";
+static const std::string EMPTY           = "";
 
 
 Messaging* Messaging::messagingInstance = NULL;
 
 //******************************************************************************
 
-void Messaging::setMessaging(Messaging* messaging) noexcept {
+void Messaging::setMessaging(Messaging* messaging)
+{
    messagingInstance = messaging;
 }
 
 //******************************************************************************
 
-Messaging* Messaging::getMessaging() noexcept {
+Messaging* Messaging::getMessaging()
+{
    return messagingInstance;
 }
 
 //******************************************************************************
 
 // throws BasicException
-void Messaging::initialize(const std::string& configFilePath) {
+void Messaging::initialize(const std::string& configFilePath)
+{
    IniReader reader(configFilePath);
    if (reader.hasSection(KEY_SERVICES)) {
       KeyValuePairs kvpServices;
       if (reader.readSection(KEY_SERVICES, kvpServices)) {
-         std::vector<std::string> keys;
+         vector<string> keys;
          kvpServices.getKeys(keys);
          int servicesRegistered = 0;
          
          Messaging* messaging(new Messaging);
+         const vector<string>::const_iterator itEnd = keys.end();
+         vector<string>::const_iterator it = keys.begin();
          
-         for (auto key : keys) {
-            const std::string& serviceName = key;
-            const std::string& sectionName = kvpServices.getValue(serviceName);
+         for (; it != itEnd; it++) {
+            const string& serviceName = *it;
+            const string& sectionName = kvpServices.getValue(serviceName);
             
             KeyValuePairs kvp;
             if (reader.readSection(sectionName, kvp)) {
                if (kvp.hasKey(KEY_HOST) && kvp.hasKey(KEY_PORT)) {
-                  const std::string& host = kvp.getValue(KEY_HOST);
-                  const std::string& portAsString = kvp.getValue(KEY_PORT);
+                  const string& host = kvp.getValue(KEY_HOST);
+                  const string& portAsString = kvp.getValue(KEY_PORT);
                   const unsigned short portValue =
                      (unsigned short) ::atoi(portAsString.c_str());
                   
                   ServiceInfo serviceInfo(serviceName, host, portValue);
                   
                   if (kvp.hasKey(KEY_PERSISTENT)) {
-                     const std::string& persistence =
+                     const string& persistence =
                         kvp.getValue(KEY_PERSISTENT);
                      if (persistence == VALUE_TRUE) {
                         serviceInfo.setPersistentConnection(true);
@@ -89,46 +94,52 @@ void Messaging::initialize(const std::string& configFilePath) {
 
 //******************************************************************************
 
-bool Messaging::isInitialized() {
+bool Messaging::isInitialized()
+{
    return NULL != getMessaging();
 }
 
 //******************************************************************************
 
 Messaging::Messaging() :
-   m_mutex(NULL) {
+   m_mutex(NULL)
+{
    ThreadingFactory* factory = ThreadingFactory::getThreadingFactory();
    if (factory == NULL) {
-      //factory = new PthreadsThreadingFactory;
-      factory = new StdThreadingFactory;
+      factory = new PthreadsThreadingFactory();
       ThreadingFactory::setThreadingFactory(factory);
    }
-  
-   m_mutex = factory->createMutex("messaging");
+   
+   m_mutex = factory->createMutex(EMPTY);
 }
 
 //******************************************************************************
 
-Messaging::~Messaging() {
+Messaging::~Messaging()
+{
 }
 
 //******************************************************************************
 
 void Messaging::registerService(const std::string& serviceName,
-                                const ServiceInfo& serviceInfo) {
+                                const ServiceInfo& serviceInfo)
+{
    m_mapServices[serviceName] = serviceInfo;
 }
 
 //******************************************************************************
 
-bool Messaging::isServiceRegistered(const std::string& serviceName) const {
+bool Messaging::isServiceRegistered(const std::string& serviceName) const
+{
    return (m_mapServices.find(serviceName) != m_mapServices.end());
 }
 
 //******************************************************************************
 
-const ServiceInfo& Messaging::getInfoForService(const std::string& serviceName) const {
-   auto it = m_mapServices.find(serviceName);
+const ServiceInfo& Messaging::getInfoForService(const std::string& serviceName) const
+{
+   const map<string,ServiceInfo>::const_iterator it =
+      m_mapServices.find(serviceName);
    if (it != m_mapServices.end()) {
       return (*it).second;
    } else {
@@ -139,20 +150,17 @@ const ServiceInfo& Messaging::getInfoForService(const std::string& serviceName) 
 
 //******************************************************************************
 
-Socket* Messaging::socketForService(const ServiceInfo& serviceInfo) {
-   const std::string serviceId = serviceInfo.getUniqueIdentifier();
-   printf("serviceId=%s\n", serviceId.c_str());
+Socket* Messaging::socketForService(const ServiceInfo& serviceInfo)
+{
+   const string serviceId = serviceInfo.getUniqueIdentifier();
    MutexLock lock(*m_mutex);
-   auto it = m_mapSocketConnections.find(serviceId);
+   map<string,Socket*>::iterator it =
+      m_mapSocketConnections.find(serviceId);
    if (it != m_mapSocketConnections.end()) {
-      printf("using existing socket\n");
       Socket* socket = (*it).second;
       m_mapSocketConnections.erase(it);
       return socket;
    } else {
-      std::string host = serviceInfo.host();
-      int port = serviceInfo.port();
-      printf("creating new socket, host=%s, port=%d\n", host.c_str(), port);
       return new Socket(serviceInfo.host(),
                         serviceInfo.port());
    }
@@ -161,8 +169,9 @@ Socket* Messaging::socketForService(const ServiceInfo& serviceInfo) {
 //******************************************************************************
 
 void Messaging::returnSocketForService(const ServiceInfo& serviceInfo,
-                                       Socket* socket) {
-   const std::string serviceId = serviceInfo.getUniqueIdentifier();
+                                       Socket* socket)
+{
+   const string serviceId = serviceInfo.getUniqueIdentifier();
    MutexLock lock(*m_mutex);
    m_mapSocketConnections[serviceId] = socket;
 }

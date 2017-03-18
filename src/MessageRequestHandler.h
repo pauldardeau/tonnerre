@@ -33,12 +33,13 @@ public:
     * @see SocketRequest()
     * @see MessageHandler()
     */
-   MessageRequestHandler(chaudiere::SocketRequest* socketRequest, MessageHandler* handler);
+   MessageRequestHandler(chaudiere::SocketRequest* socketRequest,
+                         MessageHandler* handler);
    
    /**
     * Destructor
     */
-   ~MessageRequestHandler() noexcept;
+   ~MessageRequestHandler();
    
    /**
     *

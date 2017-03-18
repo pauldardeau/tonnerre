@@ -3,7 +3,7 @@
 
 #include <string>
 #include <vector>
-#include <cstdio>
+#include <stdio.h>
 
 #include "Messaging.h"
 #include "Message.h"
@@ -12,32 +12,37 @@
 #include "Logger.h"
 #include "StdLogger.h"
 
+using namespace std;
 using namespace tonnerre;
 using namespace chaudiere;
 
 //******************************************************************************
 
 void PrintKeyValues(const KeyValuePairs& kvp) {
-   std::vector<std::string> keys;
+   vector<string> keys;
    kvp.getKeys(keys);
-   for (auto key : keys) {
-      auto value = kvp.getValue(key);
-      std::printf("key='%s', value='%s'\n", key.c_str(), value.c_str());
+   const vector<string>::const_iterator itEnd = keys.end();
+   vector<string>::const_iterator it = keys.begin();
+   for (; it != itEnd; it++) {
+      const string& key = *it;
+      const string& value = kvp.getValue(key);
+      ::printf("key='%s', value='%s'\n", key.c_str(), value.c_str());
    }
 }
 
 //******************************************************************************
 
-int main(int argc, char* argv[]) {
-   StdLogger* logger(new StdLogger(Logger::LogLevel::Info));
+int main(int argc, char* argv[])
+{
+   StdLogger* logger = new StdLogger(Info);
    //logger->setLogInstanceLifecycles(true);
    Logger::setLogger(logger);
    
-   const std::string SERVICE_SERVER_INFO = "server_info";
-   const std::string SERVICE_ECHO        = "echo_service";
-   const std::string SERVICE_STOOGE_INFO = "stooge_info_service";
+   const string SERVICE_SERVER_INFO = "server_info";
+   const string SERVICE_ECHO        = "echo_service";
+   const string SERVICE_STOOGE_INFO = "stooge_info_service";
 
-   std::string serviceName;
+   string serviceName;
    //serviceName = SERVICE_SERVER_INFO;
    serviceName = SERVICE_ECHO;
    //serviceName = SERVICE_STOOGE_INFO;
@@ -46,14 +51,13 @@ int main(int argc, char* argv[]) {
       Messaging::initialize("tonnerre.ini");
    
       if (serviceName == SERVICE_SERVER_INFO) {
-         Message message("serverInfo", Message::MessageType::Text);
+         Message message("serverInfo", MessageTypeText);
          Message response;
          if (message.send(serviceName, response)) {
-            const std::string& responseText = response.getTextPayload();
-            std::printf("response: '%s'\n", responseText.c_str());
+            const string& responseText = response.getTextPayload();
+            ::printf("response: '%s'\n", responseText.c_str());
          } else {
-            std::printf("error: unable to send message to service '%s'\n",
-                        serviceName.c_str());
+            ::printf("error: unable to send message to service '%s'\n", serviceName.c_str());
          }
       } else if (serviceName == SERVICE_ECHO) {
          KeyValuePairs kvp;
@@ -62,39 +66,34 @@ int main(int argc, char* argv[]) {
          kvp.addPair("city", "Orlando");
          kvp.addPair("state", "FL");
 
-         Message message("echo", Message::MessageType::KeyValues);
+         Message message("echo", MessageTypeKeyValues);
          message.setKeyValuesPayload(kvp);
          Message response;
          if (message.send(serviceName, response)) {
-            const KeyValuePairs& responseKeyValues =
-               response.getKeyValuesPayload();
+            const KeyValuePairs& responseKeyValues = response.getKeyValuesPayload();
             PrintKeyValues(responseKeyValues);
          } else {
-            std::printf("error: unable to send message to service '%s'\n",
-                        serviceName.c_str());
+            ::printf("error: unable to send message to service '%s'\n", serviceName.c_str());
          }
       } else if (serviceName == SERVICE_STOOGE_INFO) {
-         Message message("listStooges", Message::MessageType::KeyValues);
+         Message message("listStooges", MessageTypeKeyValues);
          Message response;
          if (message.send(serviceName, response)) {
-            const KeyValuePairs& responseKeyValues =
-               response.getKeyValuesPayload();
+            const KeyValuePairs& responseKeyValues = response.getKeyValuesPayload();
             PrintKeyValues(responseKeyValues);
          } else {
-            std::printf("error: unable to send message to service '%s'\n",
-                        serviceName.c_str());
+            ::printf("error: unable to send message to service '%s'\n", serviceName.c_str());
          }
       } else {
-         std::printf("unrecognized serviceName '%s'\n", serviceName.c_str());
+         ::printf("unrecognized serviceName '%s'\n", serviceName.c_str());
       }
    } catch (const BasicException& be) {
-      std::printf("BasicException caught: '%s'\n", be.whatString().c_str());
-   } catch (const std::exception& e) {
-      std::printf("exception caught: '%s'\n", e.what());
+      ::printf("BasicException caught: '%s'\n", be.whatString().c_str());
+   } catch (const exception& e) {
+      ::printf("exception caught: '%s'\n", e.what());
    } catch (...) {
-      std::printf("unknown exception caught\n");
+      ::printf("unknown exception caught\n");
    }
 }
 
 //******************************************************************************
-

@@ -3,7 +3,8 @@
 
 #include <string>
 #include <vector>
-#include <cstdlib>
+#include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 
 #include "Message.h"
@@ -12,6 +13,11 @@
 #include "Socket.h"
 #include "StringTokenizer.h"
 #include "Messaging.h"
+
+using namespace std;
+using namespace chaudiere;
+using namespace tonnerre;
+
 
 static const std::string EMPTY_STRING           = "";
 
@@ -39,7 +45,7 @@ using namespace tonnerre;
 //******************************************************************************
 
 tonnerre::Message* Message::reconstruct(Socket* socket) {
-   Message* message(new Message());
+   Message* message = new Message();
    if (message->reconstitute(socket)) {
       return message;
    } else {
@@ -51,7 +57,7 @@ tonnerre::Message* Message::reconstruct(Socket* socket) {
 //******************************************************************************
 
 Message::Message() :
-   m_messageType(MessageType::Unknown),
+   m_messageType(MessageTypeUnknown),
    m_isOneWay(false),
    m_persistentConnection(false) {
    Logger::logInstanceCreate("Message");
@@ -107,12 +113,12 @@ Message& Message::operator=(const Message& copy) {
 //******************************************************************************
 
 bool Message::send(const std::string& serviceName) {
-   if (m_messageType == MessageType::Unknown) {
+   if (m_messageType == MessageTypeUnknown) {
       Logger::error("unable to send message, no message type set");
       return false;
    }
 
-   Socket* socket = socketForService(serviceName);
+   Socket* socket(socketForService(serviceName));
    
    if (socket != NULL) {
       m_isOneWay = true;
@@ -128,7 +134,7 @@ bool Message::send(const std::string& serviceName) {
       returnSocketForService(serviceName, socket);
    } else {
       // unable to connect to service
-      Logger::error("unable to connect to service (socketForService returned NULL)");
+      Logger::error("unable to connect to service");
    }
    
    return false;
@@ -137,7 +143,7 @@ bool Message::send(const std::string& serviceName) {
 //******************************************************************************
 
 bool Message::send(const std::string& serviceName, Message& responseMessage) {
-   if (m_messageType == MessageType::Unknown) {
+   if (m_messageType == MessageTypeUnknown) {
       Logger::error("unable to send message, no message type set");
       return false;
    }
@@ -168,7 +174,7 @@ bool Message::send(const std::string& serviceName, Message& responseMessage) {
 
 //******************************************************************************
 
-Message::MessageType Message::getType() const {
+MessageType Message::getType() const {
    return m_messageType;
 }
 
@@ -215,25 +221,22 @@ std::string Message::getRequestName() const {
 //******************************************************************************
 
 Socket* Message::socketForService(const std::string& serviceName) const {
-   Messaging* messaging = Messaging::getMessaging();
+   Messaging* messaging(Messaging::getMessaging());
    
    if (messaging != NULL) {
       if (messaging->isServiceRegistered(serviceName)) {
-         const ServiceInfo& serviceInfo = messaging->getInfoForService(serviceName);
+         const ServiceInfo& serviceInfo =
+            messaging->getInfoForService(serviceName);
          //const std::string& host = serviceInfo.host();
          //const unsigned short port = serviceInfo.port();
-         const bool persistentConnection = serviceInfo.getPersistentConnection();
-
+         const bool persistentConnection =
+            serviceInfo.getPersistentConnection();
          Socket* socket = NULL;
             
          if (persistentConnection) {
-            printf("persistent connection set true\n");
             m_persistentConnection = true;
             socket =
                messaging->socketForService(serviceInfo);
-         } else {
-            printf("persistent connection set false\n");
-            socket = messaging->socketForService(serviceInfo);
          }
             
          return socket;
@@ -256,7 +259,8 @@ void Message::returnSocketForService(const std::string& serviceName,
          Messaging* messaging(Messaging::getMessaging());
          if (messaging != NULL) {
             if (messaging->isServiceRegistered(serviceName)) {
-               const ServiceInfo& serviceInfo = messaging->getInfoForService(serviceName);
+               const ServiceInfo& serviceInfo =
+                  messaging->getInfoForService(serviceName);
                if (serviceInfo.getPersistentConnection()) {
                   messaging->returnSocketForService(serviceInfo, socket);
                }
@@ -268,7 +272,9 @@ void Message::returnSocketForService(const std::string& serviceName,
 
 //******************************************************************************
 
-std::string Message::readSocketBytes(Socket* socket, int numberBytes, bool& success) {
+std::string Message::readSocketBytes(Socket* socket,
+                                     int numberBytes,
+                                     bool& success) {
    if (numberBytes < MAX_STACK_BUFFER_SIZE) {
       char stackBuffer[MAX_STACK_BUFFER_SIZE];
       memset(stackBuffer, 0, MAX_STACK_BUFFER_SIZE);
@@ -286,7 +292,7 @@ std::string Message::readSocketBytes(Socket* socket, int numberBytes, bool& succ
       if (numberBytes <= MAX_SEGMENT_LENGTH) {
          std::string returnValue;
          char* heapBuffer = new char[numberBytes+1];
-         memset(heapBuffer, 0, numberBytes+1);
+         ::memset(heapBuffer, 0, numberBytes+1);
          if (socket->readSocket(heapBuffer, numberBytes)) {
             heapBuffer[numberBytes] = '\0';
             success = true;
@@ -320,7 +326,7 @@ bool Message::reconstitute(Socket* socket) {
          
          std::string headerLengthPrefix = headerLengthPrefixBuffer;
          StrUtils::stripTrailing(headerLengthPrefix, ' ');
-         const std::size_t headerLength = std::atol(headerLengthPrefix.c_str());
+         const std::size_t headerLength = ::atol(headerLengthPrefix.c_str());
          
          if (headerLength > 0) {
             bool headerRead = false;
@@ -330,27 +336,30 @@ bool Message::reconstitute(Socket* socket) {
             if (headerRead && !headerAsString.empty()) {
                if (fromString(headerAsString, m_kvpHeaders)) {
                   if (m_kvpHeaders.hasKey(KEY_PAYLOAD_TYPE)) {
-                     const std::string& valuePayloadType = m_kvpHeaders.getValue(KEY_PAYLOAD_TYPE);
+                     const std::string& valuePayloadType =
+                        m_kvpHeaders.getValue(KEY_PAYLOAD_TYPE);
                      
                      if (valuePayloadType == VALUE_PAYLOAD_TEXT) {
-                        m_messageType = MessageType::Text;
+                        m_messageType = MessageTypeText;
                      } else if (valuePayloadType == VALUE_PAYLOAD_KVP) {
-                        m_messageType = MessageType::KeyValues;
+                        m_messageType = MessageTypeKeyValues;
                      } else {
                         Logger::error("unrecognized payload type");
                      }
                   }
                   
-                  if (m_messageType == MessageType::Unknown) {
+                  if (m_messageType == MessageTypeUnknown) {
                      Logger::error("unable to identify message type from header");
                      return false;
                   }
                   
                   if (m_kvpHeaders.hasKey(KEY_PAYLOAD_LENGTH)) {
-                     const std::string& valuePayloadLength = m_kvpHeaders.getValue(KEY_PAYLOAD_LENGTH);
+                     const std::string& valuePayloadLength =
+                        m_kvpHeaders.getValue(KEY_PAYLOAD_LENGTH);
                      
                      if (!valuePayloadLength.empty()) {
-                        const std::size_t payloadLength = std::atol(valuePayloadLength.c_str());
+                        const std::size_t payloadLength =
+                           ::atol(valuePayloadLength.c_str());
                         
                         if (payloadLength > 0) {
                            bool payloadRead = false;
@@ -358,9 +367,9 @@ bool Message::reconstitute(Socket* socket) {
                               readSocketBytes(socket, payloadLength, payloadRead);
                            
                            if (payloadRead && !payloadAsString.empty()) {
-                              if (m_messageType == MessageType::Text) {
+                              if (m_messageType == MessageTypeText) {
                                  m_textPayload = payloadAsString;
-                              } else if (m_messageType == MessageType::KeyValues) {
+                              } else if (m_messageType == MessageTypeKeyValues) {
                                  fromString(payloadAsString, m_kvpPayload);
                               }
                            }
@@ -369,7 +378,8 @@ bool Message::reconstitute(Socket* socket) {
                   }
                   
                   if (m_kvpHeaders.hasKey(KEY_ONE_WAY)) {
-                     const std::string& valueOneWay = m_kvpHeaders.getValue(KEY_ONE_WAY);
+                     const std::string& valueOneWay =
+                        m_kvpHeaders.getValue(KEY_ONE_WAY);
                      if (valueOneWay == VALUE_TRUE) {
                         // mark it as being a 1-way message
                         m_isOneWay = true;
@@ -407,10 +417,10 @@ std::string Message::toString() const {
    KeyValuePairs kvpHeaders(m_kvpHeaders);
    std::string payload;
    
-   if (m_messageType == MessageType::Text) {
+   if (m_messageType == MessageTypeText) {
       kvpHeaders.addPair(KEY_PAYLOAD_TYPE, VALUE_PAYLOAD_TEXT);
       payload = m_textPayload;
-   } else if (m_messageType == MessageType::KeyValues) {
+   } else if (m_messageType == MessageTypeKeyValues) {
       kvpHeaders.addPair(KEY_PAYLOAD_TYPE, VALUE_PAYLOAD_KVP);
       payload = toString(m_kvpPayload);
    } else {
@@ -422,7 +432,8 @@ std::string Message::toString() const {
    }
    
    if (m_kvpHeaders.hasKey(KEY_REQUEST_NAME)) {
-      kvpHeaders.addPair(KEY_REQUEST_NAME, m_kvpHeaders.getValue(KEY_REQUEST_NAME));
+      kvpHeaders.addPair(KEY_REQUEST_NAME,
+                         m_kvpHeaders.getValue(KEY_REQUEST_NAME));
    } else {
       kvpHeaders.addPair(KEY_REQUEST_NAME, EMPTY_STRING);
    }
@@ -449,16 +460,19 @@ std::string Message::toString(const KeyValuePairs& kvp) {
    std::string kvpAsString;
    
    if (!kvp.empty()) {
-      std::vector<std::string> keys;
+      vector<string> keys;
       kvp.getKeys(keys);
       int i = 0;
+      const vector<string>::const_iterator itEnd = keys.end();
+      vector<string>::const_iterator it = keys.begin();
       
-      for (auto key : keys) {
+      for (; it != itEnd; it++) {
          if (i > 0) {
             // append pair delimiter
             kvpAsString += DELIMITER_PAIR;
          }
-         
+        
+         const string& key = *it; 
          kvpAsString += key;
          kvpAsString += DELIMITER_KEY_VALUE;
          kvpAsString += kvp.getValue(key);
@@ -502,8 +516,8 @@ bool Message::fromString(const std::string& s, KeyValuePairs& kvp) {
 
 std::string Message::encodeLength(std::size_t lengthBytes) {
    char lengthAsChars[11];
-   memset(lengthAsChars, 0, NUM_CHARS_HEADER_LENGTH+1);
-   snprintf(lengthAsChars, NUM_CHARS_HEADER_LENGTH, "%lu", lengthBytes);
+   ::memset(lengthAsChars, 0, NUM_CHARS_HEADER_LENGTH+1);
+   ::snprintf(lengthAsChars, NUM_CHARS_HEADER_LENGTH, "%lu", lengthBytes);
    return std::string(lengthAsChars);
 }
 
@@ -516,7 +530,7 @@ std::size_t Message::decodeLength(Socket* socket) {
       char lengthAsChars[11];
       memset(lengthAsChars, 0, NUM_CHARS_HEADER_LENGTH+1);
       if (socket->read(lengthAsChars, NUM_CHARS_HEADER_LENGTH)) {
-         return std::atol(lengthAsChars);
+         return ::atol(lengthAsChars);
       }
    }
    
@@ -542,4 +556,3 @@ const std::string& Message::getHeader(const std::string& key) const {
 }
 
 //******************************************************************************
-

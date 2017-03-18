@@ -13,6 +13,13 @@
 namespace tonnerre
 {
 
+enum MessageType {
+   MessageTypeUnknown,
+   MessageTypeKeyValues,
+   MessageTypeText
+};
+
+
 /**
  * The Message class is the primary object used for sending and receiving messages.
  * A new instance should be created for each message to send.  The messaging server
@@ -22,12 +29,6 @@ namespace tonnerre
 class Message
 {
 public:
-   enum class MessageType {
-      Unknown,
-      KeyValues,
-      Text
-   };
-   
    /**
     * Reconstructs a message by reading from a socket
     * @param socket the socket to read from
@@ -46,7 +47,8 @@ public:
     * @param requestName the name of the message request
     * @param messageType the type of the message
     */
-   Message(const std::string& requestName, MessageType messageType=MessageType::Unknown);
+   Message(const std::string& requestName,
+           MessageType messageType=MessageTypeUnknown);
    
    /**
     * Copy constructor
@@ -180,7 +182,7 @@ public:
    /**
     * Retrieves a socket connection for the specified service (used internally)
     * @param serviceName the name of the service whose connection is needed
-    * @return a Socket instance on success, nullptr on failure
+    * @return a Socket instance on success, NULL on failure
     */
    chaudiere::Socket* socketForService(const std::string& serviceName) const;
 
@@ -232,4 +234,3 @@ private:
 }
 
 #endif
-

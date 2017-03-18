@@ -32,12 +32,12 @@ public:
     */
    MessagingServer(const std::string& configFilePath,
                    const std::string& serviceName,
-                   MessageHandler* handler=nullptr);
+                   MessageHandler* handler=NULL);
                    
    /**
     * Destructor
     */
-   ~MessagingServer() noexcept;
+   ~MessagingServer();
    
    /**
     * Sets the message handler
