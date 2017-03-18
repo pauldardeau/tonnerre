@@ -517,7 +517,7 @@ bool Message::fromString(const std::string& s, KeyValuePairs& kvp) {
 std::string Message::encodeLength(std::size_t lengthBytes) {
    char lengthAsChars[11];
    ::memset(lengthAsChars, 0, NUM_CHARS_HEADER_LENGTH+1);
-   ::snprintf(lengthAsChars, NUM_CHARS_HEADER_LENGTH, "%lu", lengthBytes);
+   ::snprintf(lengthAsChars, NUM_CHARS_HEADER_LENGTH, "%zu", lengthBytes);
    return std::string(lengthAsChars);
 }
 
