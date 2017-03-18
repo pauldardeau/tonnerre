@@ -326,7 +326,8 @@ bool Message::reconstitute(Socket* socket) {
          
          std::string headerLengthPrefix = headerLengthPrefixBuffer;
          StrUtils::stripTrailing(headerLengthPrefix, ' ');
-         const std::size_t headerLength = ::atol(headerLengthPrefix.c_str());
+         const std::size_t headerLength =
+            StrUtils::parseLong(headerLengthPrefix);
          
          if (headerLength > 0) {
             bool headerRead = false;
@@ -359,7 +360,7 @@ bool Message::reconstitute(Socket* socket) {
                      
                      if (!valuePayloadLength.empty()) {
                         const std::size_t payloadLength =
-                           ::atol(valuePayloadLength.c_str());
+                           StrUtils::parseLong(valuePayloadLength);
                         
                         if (payloadLength > 0) {
                            bool payloadRead = false;

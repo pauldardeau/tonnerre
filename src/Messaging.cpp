@@ -10,6 +10,7 @@
 #include "KeyValuePairs.h"
 #include "MutexLock.h"
 #include "PthreadsThreadingFactory.h"
+#include "StrUtils.h"
 
 using namespace std;
 using namespace tonnerre;
@@ -67,7 +68,7 @@ void Messaging::initialize(const std::string& configFilePath)
                   const string& host = kvp.getValue(KEY_HOST);
                   const string& portAsString = kvp.getValue(KEY_PORT);
                   const unsigned short portValue =
-                     (unsigned short) ::atoi(portAsString.c_str());
+                     (unsigned short) StrUtils::parseInt(portAsString);
                   
                   ServiceInfo serviceInfo(serviceName, host, portValue);
                   
