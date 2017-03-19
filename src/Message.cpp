@@ -13,6 +13,7 @@
 #include "Socket.h"
 #include "StringTokenizer.h"
 #include "Messaging.h"
+#include "CharBuffer.h"
 
 using namespace std;
 using namespace chaudiere;
@@ -291,18 +292,15 @@ std::string Message::readSocketBytes(Socket* socket,
    } else {
       if (numberBytes <= MAX_SEGMENT_LENGTH) {
          std::string returnValue;
-         char* heapBuffer = new char[numberBytes+1];
-         ::memset(heapBuffer, 0, numberBytes+1);
-         if (socket->readSocket(heapBuffer, numberBytes)) {
-            heapBuffer[numberBytes] = '\0';
+         CharBuffer heapBuffer(numberBytes+1);
+         if (socket->readSocket(heapBuffer.data(), numberBytes)) {
+            heapBuffer.nullAt(numberBytes);
             success = true;
-            returnValue = heapBuffer;
+            returnValue = heapBuffer.data();
          } else {
             Logger::error("reading socket for header failed");
             success = false;
          }
-         
-         delete [] heapBuffer;
          
          return returnValue;
       } else {
