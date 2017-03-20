@@ -152,9 +152,6 @@ bool Message::send(const std::string& serviceName, Message& responseMessage) {
    Socket* socket(socketForService(serviceName));
    
    if (socket != NULL) {
-      //const std::string payload = toString();
-      //printf("payload: '%s'\n", payload.c_str());
-      
       if (socket->write(toString())) {
          const bool rc = responseMessage.reconstitute(socket);
          returnSocketForService(serviceName, socket);
@@ -228,21 +225,17 @@ Socket* Message::socketForService(const std::string& serviceName) const {
       if (messaging->isServiceRegistered(serviceName)) {
          const ServiceInfo& serviceInfo =
             messaging->getInfoForService(serviceName);
+         m_persistentConnection = serviceInfo.getPersistentConnection();
+
          //const std::string& host = serviceInfo.host();
          //const unsigned short port = serviceInfo.port();
-         const bool persistentConnection =
-            serviceInfo.getPersistentConnection();
-         Socket* socket = NULL;
-            
-         if (persistentConnection) {
-            m_persistentConnection = true;
-            socket =
-               messaging->socketForService(serviceInfo);
-         }
-            
-         return socket;
+         //printf("host='%s'\n", host.c_str());
+         //printf("port='%d'\n", port);
+
+         return messaging->socketForService(serviceInfo);
       } else {
          Logger::error("service is not registered");
+         printf("service is not registered\n");
       }
    } else {
       Logger::error("messaging not initialized");

@@ -122,6 +122,7 @@ int main(int argc, char* argv[])
    }
    
    if (handler != NULL) {
+      printf("starting service %s\n", serviceName.c_str());
       MessagingServer server("tonnerre.ini", serviceName, handler);
       server.run();
       delete handler;
