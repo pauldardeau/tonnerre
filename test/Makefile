@@ -3,27 +3,38 @@
 
 CC = g++
 CC_OPTS = -c -pthread -I../src -I../../chaudiere/src
+UT_CC_OPTS = $(CC_OPTS) -I../../poivre
 
-CLIENT = TestClient
-SERVER = TestServer
-LIB_NAME = tonnerre.so
+CLIENT_EXE = TestClient
+SERVER_EXE = TestServer
+UNIT_TESTS_EXE = test_tonnerre
+LIB_NAMES = ../src/tonnerre.so ../../chaudiere/src/chaudiere.so
+UT_LIBS = $(LIB_NAMES) ../../poivre/poivre.so
+STD_LINK_LIBS = -lpthread -ldl
 
-CLIENT_OBJS = TestClient.o
+CLIENT_EXE_OBJS = TestClient.o
 
-SERVER_OBJS = TestServer.o
+SERVER_EXE_OBJS = TestServer.o
 
-all : $(CLIENT) $(SERVER)
+UNIT_TESTS_EXE_OBJS = Tests.o TestMessaging.o TestMessagingServer.o TestMessage.o TestMessageRequestHandler.o TestMessageSocketServiceHandler.o
+
+all : $(CLIENT_EXE) $(SERVER_EXE) $(UNIT_TESTS_EXE)
 
 clean :
 	rm -f *.o
-	rm -f $(CLIENT)
-	rm -f $(SERVER)
+	rm -f $(CLIENT_EXE)
+	rm -f $(SERVER_EXE)
+	rm -f $(UNIT_TESTS_EXE)
 
-$(CLIENT) : $(CLIENT_OBJS)
-	$(CC) $(CLIENT_OBJS) -o $(CLIENT) ../../chaudiere/src/chaudiere.so ../src/$(LIB_NAME) -lpthread -ldl
+$(CLIENT_EXE) : $(CLIENT_EXE_OBJS)
+	$(CC) $(CLIENT_EXE_OBJS) -o $(CLIENT_EXE) $(LIB_NAMES) $(STD_LINK_LIBS)
 
-$(SERVER) : $(SERVER_OBJS)
-	$(CC) $(SERVER_OBJS) -o $(SERVER) ../../chaudiere/src/chaudiere.so ../src/$(LIB_NAME) -lpthread -ldl
+$(SERVER_EXE) : $(SERVER_EXE_OBJS)
+	$(CC) $(SERVER_EXE_OBJS) -o $(SERVER_EXE) $(LIB_NAMES) $(STD_LINK_LIBS)
+
+$(UNIT_TESTS_EXE) : $(UNIT_TESTS_EXE_OBJS)
+	$(CC) $(UNIT_TESTS_EXE_OBJS) -o $(UNIT_TESTS_EXE) $(UT_LIBS) $(STD_LINK_LIBS)
+
 
 %.o : %.cpp
-	$(CC) $(CC_OPTS) $< -o $@
+	$(CC) $(UT_CC_OPTS) $< -o $@
