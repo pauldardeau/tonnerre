@@ -1,8 +1,8 @@
 # Copyright Paul Dardeau, SwampBits LLC 2014
 # BSD License
 
-CC = g++
-CC_OPTS = -c -Wall -shared -fPIC -O2 -I../../chaudiere/src
+CC = c++
+CC_OPTS = -c -Wall -fPIC -O2 -I../../chaudiere/src
 
 LIB_NAME = tonnerre.so
 

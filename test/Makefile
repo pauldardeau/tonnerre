@@ -1,7 +1,7 @@
 # Copyright Paul Dardeau, SwampBits LLC 2014
 # BSD License
 
-CC = g++
+CC = c++
 CC_OPTS = -c -pthread -I../src -I../../chaudiere/src
 UT_CC_OPTS = $(CC_OPTS) -I../../poivre
 
@@ -10,7 +10,7 @@ SERVER_EXE = TestServer
 UNIT_TESTS_EXE = test_tonnerre
 LIB_NAMES = ../src/tonnerre.so ../../chaudiere/src/chaudiere.so
 UT_LIBS = $(LIB_NAMES) ../../poivre/poivre.so
-STD_LINK_LIBS = -lpthread -ldl
+STD_LINK_LIBS = -lpthread
 
 CLIENT_EXE_OBJS = TestClient.o
 
