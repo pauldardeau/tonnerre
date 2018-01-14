@@ -8,9 +8,9 @@ UT_CC_OPTS = $(CC_OPTS) -I../../poivre
 CLIENT_EXE = TestClient
 SERVER_EXE = TestServer
 UNIT_TESTS_EXE = test_tonnerre
-LIB_NAMES = ../src/tonnerre.so ../../chaudiere/src/chaudiere.so
+LIB_NAMES = ../src/tonnerre.so ../../chaudiere/src/libchaudiere.so
 UT_LIBS = $(LIB_NAMES) ../../poivre/poivre.so
-STD_LINK_LIBS = -lpthread
+STD_LINK_LIBS = -lpthread -ldl
 
 CLIENT_EXE_OBJS = TestClient.o
 
