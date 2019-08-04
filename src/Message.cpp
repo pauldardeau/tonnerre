@@ -455,16 +455,13 @@ std::string Message::toString(const KeyValuePairs& kvp) {
       vector<string> keys;
       kvp.getKeys(keys);
       int i = 0;
-      const vector<string>::const_iterator itEnd = keys.end();
-      vector<string>::const_iterator it = keys.begin();
       
-      for (; it != itEnd; it++) {
+      for (const string& key : keys) {
          if (i > 0) {
             // append pair delimiter
             kvpAsString += DELIMITER_PAIR;
          }
         
-         const string& key = *it; 
          kvpAsString += key;
          kvpAsString += DELIMITER_KEY_VALUE;
          kvpAsString += kvp.getValue(key);
