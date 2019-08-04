@@ -35,7 +35,7 @@ public:
     * @return a new Message object instance constructed by reading data from socket
     * @see Socket()
     */
-   static Message* reconstruct(chaudiere::Socket* socket);
+   static std::unique_ptr<Message> reconstruct(chaudiere::Socket* socket);
    
    /**
     * Default constructor (used internally)

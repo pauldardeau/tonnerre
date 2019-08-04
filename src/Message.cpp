@@ -45,12 +45,12 @@ using namespace tonnerre;
 
 //******************************************************************************
 
-tonnerre::Message* Message::reconstruct(Socket* socket) {
-   Message* message = new Message();
+std::unique_ptr<Message> Message::reconstruct(Socket* socket) {
+   std::unique_ptr<Message> message(new Message());
    if (message->reconstitute(socket)) {
       return message;
    } else {
-      delete message;
+      message.reset();
       return nullptr;
    }
 }
