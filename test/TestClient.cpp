@@ -34,7 +34,7 @@ void PrintKeyValues(const KeyValuePairs& kvp) {
 
 int main(int argc, char* argv[])
 {
-   StdLogger* logger = new StdLogger(Info);
+   StdLogger* logger = new StdLogger(LogLevel::Info);
    //logger->setLogInstanceLifecycles(true);
    Logger::setLogger(logger);
    

@@ -109,7 +109,7 @@ int main(int argc, char* argv[])
    //serviceName = SERVICE_STOOGE_INFO;
    MessageHandler* handler = NULL;
    
-   StdLogger* logger = new StdLogger(Info);
+   StdLogger* logger = new StdLogger(LogLevel::Info);
    //logger->setLogInstanceLifecycles(true);
    Logger::setLogger(logger);
    
