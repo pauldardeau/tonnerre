@@ -182,7 +182,7 @@ public:
    /**
     * Retrieves a socket connection for the specified service (used internally)
     * @param serviceName the name of the service whose connection is needed
-    * @return a Socket instance on success, NULL on failure
+    * @return a Socket instance on success, nullptr on failure
     */
    chaudiere::Socket* socketForService(const std::string& serviceName) const;
 

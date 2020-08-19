@@ -29,7 +29,7 @@ public:
    
    /**
     * Retrieves the Messaging singleton instance
-    * @return pointer to the Messaging instance, or NULL if not initialized
+    * @return pointer to the Messaging instance, or nullptr if not initialized
     */
    static Messaging* getMessaging();
    

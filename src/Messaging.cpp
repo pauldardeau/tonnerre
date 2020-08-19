@@ -25,7 +25,7 @@ static const std::string VALUE_TRUE      = "true";
 static const std::string EMPTY           = "";
 
 
-Messaging* Messaging::messagingInstance = NULL;
+Messaging* Messaging::messagingInstance = nullptr;
 
 //******************************************************************************
 
@@ -55,11 +55,8 @@ void Messaging::initialize(const std::string& configFilePath)
          int servicesRegistered = 0;
          
          Messaging* messaging(new Messaging);
-         const vector<string>::const_iterator itEnd = keys.end();
-         vector<string>::const_iterator it = keys.begin();
          
-         for (; it != itEnd; it++) {
-            const string& serviceName = *it;
+         for (auto& serviceName: keys) {
             const string& sectionName = kvpServices.getValue(serviceName);
             
             KeyValuePairs kvp;
@@ -97,16 +94,16 @@ void Messaging::initialize(const std::string& configFilePath)
 
 bool Messaging::isInitialized()
 {
-   return NULL != getMessaging();
+   return nullptr != getMessaging();
 }
 
 //******************************************************************************
 
 Messaging::Messaging() :
-   m_mutex(NULL)
+   m_mutex(nullptr)
 {
    ThreadingFactory* factory = ThreadingFactory::getThreadingFactory();
-   if (factory == NULL) {
+   if (factory == nullptr) {
       factory = new PthreadsThreadingFactory();
       ThreadingFactory::setThreadingFactory(factory);
    }
