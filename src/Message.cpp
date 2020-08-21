@@ -6,6 +6,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <memory>
 
 #include "Message.h"
 #include "Logger.h"
@@ -58,7 +59,7 @@ tonnerre::Message* Message::reconstruct(Socket* socket) {
 //******************************************************************************
 
 Message::Message() :
-   m_messageType(MessageTypeUnknown),
+   m_messageType(MessageType::Unknown),
    m_isOneWay(false),
    m_persistentConnection(false) {
    Logger::logInstanceCreate("Message");
@@ -89,6 +90,19 @@ Message::Message(const Message& copy) :
 
 //******************************************************************************
 
+Message::Message(Message&& other) :
+   m_serviceName(std::move(other.m_serviceName)),
+   m_textPayload(std::move(other.m_textPayload)),
+   m_kvpPayload(std::move(other.m_kvpPayload)),
+   m_kvpHeaders(std::move(other.m_kvpHeaders)),
+   m_messageType(other.m_messageType),
+   m_isOneWay(std::exchange(other.m_isOneWay, false)),
+   m_persistentConnection(std::exchange(other.m_persistentConnection, false)) {
+   Logger::logInstanceCreate("Message");
+}
+
+//******************************************************************************
+
 Message::~Message() {
    Logger::logInstanceDestroy("Message");
 }
@@ -113,8 +127,26 @@ Message& Message::operator=(const Message& copy) {
 
 //******************************************************************************
 
+Message& Message::operator=(Message&& other) {
+   if (this == &other) {
+      return *this;
+   }
+
+   m_serviceName = std::move(other.m_serviceName);
+   m_textPayload = std::move(other.m_textPayload);
+   m_kvpPayload = std::move(other.m_kvpPayload);
+   m_kvpHeaders = std::move(other.m_kvpHeaders);
+   m_messageType = other.m_messageType;
+   m_isOneWay = std::exchange(other.m_isOneWay, false);
+   m_persistentConnection = std::exchange(other.m_persistentConnection, false);
+
+   return *this;
+}
+
+//******************************************************************************
+
 bool Message::send(const std::string& serviceName) {
-   if (m_messageType == MessageTypeUnknown) {
+   if (m_messageType == MessageType::Unknown) {
       Logger::error("unable to send message, no message type set");
       return false;
    }
@@ -144,7 +176,7 @@ bool Message::send(const std::string& serviceName) {
 //******************************************************************************
 
 bool Message::send(const std::string& serviceName, Message& responseMessage) {
-   if (m_messageType == MessageTypeUnknown) {
+   if (m_messageType == MessageType::Unknown) {
       Logger::error("unable to send message, no message type set");
       return false;
    }
@@ -332,15 +364,15 @@ bool Message::reconstitute(Socket* socket) {
                         m_kvpHeaders.getValue(KEY_PAYLOAD_TYPE);
                      
                      if (valuePayloadType == VALUE_PAYLOAD_TEXT) {
-                        m_messageType = MessageTypeText;
+                        m_messageType = MessageType::Text;
                      } else if (valuePayloadType == VALUE_PAYLOAD_KVP) {
-                        m_messageType = MessageTypeKeyValues;
+                        m_messageType = MessageType::KeyValues;
                      } else {
                         Logger::error("unrecognized payload type");
                      }
                   }
                   
-                  if (m_messageType == MessageTypeUnknown) {
+                  if (m_messageType == MessageType::Unknown) {
                      Logger::error("unable to identify message type from header");
                      return false;
                   }
@@ -359,9 +391,9 @@ bool Message::reconstitute(Socket* socket) {
                               readSocketBytes(socket, payloadLength, payloadRead);
                            
                            if (payloadRead && !payloadAsString.empty()) {
-                              if (m_messageType == MessageTypeText) {
+                              if (m_messageType == MessageType::Text) {
                                  m_textPayload = payloadAsString;
-                              } else if (m_messageType == MessageTypeKeyValues) {
+                              } else if (m_messageType == MessageType::KeyValues) {
                                  fromString(payloadAsString, m_kvpPayload);
                               }
                            }
@@ -409,10 +441,10 @@ std::string Message::toString() const {
    KeyValuePairs kvpHeaders(m_kvpHeaders);
    std::string payload;
    
-   if (m_messageType == MessageTypeText) {
+   if (m_messageType == MessageType::Text) {
       kvpHeaders.addPair(KEY_PAYLOAD_TYPE, VALUE_PAYLOAD_TEXT);
       payload = m_textPayload;
-   } else if (m_messageType == MessageTypeKeyValues) {
+   } else if (m_messageType == MessageType::KeyValues) {
       kvpHeaders.addPair(KEY_PAYLOAD_TYPE, VALUE_PAYLOAD_KVP);
       payload = toString(m_kvpPayload);
    } else {

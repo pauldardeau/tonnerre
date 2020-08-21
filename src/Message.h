@@ -13,10 +13,10 @@
 namespace tonnerre
 {
 
-enum MessageType {
-   MessageTypeUnknown,
-   MessageTypeKeyValues,
-   MessageTypeText
+enum class MessageType {
+   Unknown,
+   KeyValues,
+   Text
 };
 
 
@@ -48,14 +48,20 @@ public:
     * @param messageType the type of the message
     */
    Message(const std::string& requestName,
-           MessageType messageType=MessageTypeUnknown);
+           MessageType messageType=MessageType::Unknown);
    
    /**
     * Copy constructor
     * @param copy the source of the copy construction
     */
    Message(const Message& copy);
-   
+  
+   /**
+    * Move constructor
+    * @param other the source of the move
+    */
+   Message(Message&& other);
+ 
    /**
     * Destructor
     */
@@ -83,7 +89,14 @@ public:
     * @return reference to target of copy
     */
    Message& operator=(const Message& copy);
-   
+
+   /**
+    * Move operator
+    * @param other the source of the move
+    * @return reference to target of move
+    */
+   Message& operator=(Message&& other);
+
    /**
     * Reconstitute a message by reading message state data from a socket (used internally)
     * @param socket the socket from which to read message state data
