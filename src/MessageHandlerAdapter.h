@@ -33,7 +33,7 @@ public:
                                   Message& responseMessage,
                                   const std::string& requestName,
                                   const std::string& requestPayload,
-                                  std::string& responsePayload) {}
+                                  std::string& responsePayload) override {}
    
    /**
     *
@@ -47,7 +47,7 @@ public:
                                        Message& responseMessage,
                                        const std::string& requestName,
                                        const chaudiere::KeyValuePairs& requestPayload,
-                                       chaudiere::KeyValuePairs& responsePayload) {}
+                                       chaudiere::KeyValuePairs& responsePayload) override {}
 };
 
 }
