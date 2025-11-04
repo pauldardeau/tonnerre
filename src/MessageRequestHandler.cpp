@@ -41,9 +41,9 @@ void MessageRequestHandler::run() {
    Socket* socket(getSocket());
    MessageHandler* messageHandler = m_handler;
    
-   if ((socket != NULL) && (messageHandler != NULL)) {
+   if ((socket != nullptr) && (messageHandler != nullptr)) {
       Message* requestMessage(Message::reconstruct(socket));
-      if (requestMessage != NULL) {
+      if (requestMessage != nullptr) {
          const std::string& requestName = requestMessage->getRequestName();
          if (!requestName.empty()) {
             const MessageType messageType = requestMessage->getType();
@@ -103,11 +103,11 @@ void MessageRequestHandler::run() {
          Logger::error("unable to reconstruct request message");
       }
    } else {
-      if (socket == NULL) {
+      if (socket == nullptr) {
          Logger::error("no socket provided");
       }
       
-      if (messageHandler == NULL) {
+      if (messageHandler == nullptr) {
          Logger::error("no message handler provided");
       }
    }

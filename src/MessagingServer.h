@@ -32,7 +32,7 @@ public:
     */
    MessagingServer(const std::string& configFilePath,
                    const std::string& serviceName,
-                   MessageHandler* handler=NULL);
+                   MessageHandler* handler=nullptr);
                    
    /**
     * Destructor

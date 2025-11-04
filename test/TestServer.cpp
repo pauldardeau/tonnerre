@@ -107,7 +107,7 @@ int main(int argc, char* argv[])
    //serviceName = SERVICE_SERVER_INFO;
    serviceName = SERVICE_ECHO;
    //serviceName = SERVICE_STOOGE_INFO;
-   MessageHandler* handler = NULL;
+   MessageHandler* handler = nullptr;
    
    StdLogger* logger = new StdLogger(Info);
    //logger->setLogInstanceLifecycles(true);
@@ -121,7 +121,7 @@ int main(int argc, char* argv[])
       handler = new StoogeInfoService();
    }
    
-   if (handler != NULL) {
+   if (handler != nullptr) {
       printf("starting service %s\n", serviceName.c_str());
       MessagingServer server("tonnerre.ini", serviceName, handler);
       server.run();

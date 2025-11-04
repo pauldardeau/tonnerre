@@ -51,7 +51,7 @@ tonnerre::Message* Message::reconstruct(Socket* socket) {
       return message;
    } else {
       delete message;
-      return NULL;
+      return nullptr;
    }
 }
 
@@ -121,7 +121,7 @@ bool Message::send(const std::string& serviceName) {
 
    Socket* socket(socketForService(serviceName));
    
-   if (socket != NULL) {
+   if (socket != nullptr) {
       m_isOneWay = true;
       
       if (socket->write(toString())) {
@@ -151,7 +151,7 @@ bool Message::send(const std::string& serviceName, Message& responseMessage) {
    
    Socket* socket(socketForService(serviceName));
    
-   if (socket != NULL) {
+   if (socket != nullptr) {
       if (socket->write(toString())) {
          const bool rc = responseMessage.reconstitute(socket);
          returnSocketForService(serviceName, socket);
@@ -221,7 +221,7 @@ std::string Message::getRequestName() const {
 Socket* Message::socketForService(const std::string& serviceName) const {
    Messaging* messaging(Messaging::getMessaging());
    
-   if (messaging != NULL) {
+   if (messaging != nullptr) {
       if (messaging->isServiceRegistered(serviceName)) {
          const ServiceInfo& serviceInfo =
             messaging->getInfoForService(serviceName);
@@ -241,7 +241,7 @@ Socket* Message::socketForService(const std::string& serviceName) const {
       Logger::error("messaging not initialized");
    }
    
-   return NULL;
+   return nullptr;
 }
 
 //******************************************************************************
@@ -249,9 +249,9 @@ Socket* Message::socketForService(const std::string& serviceName) const {
 void Message::returnSocketForService(const std::string& serviceName,
                                      chaudiere::Socket* socket) {
    if (m_persistentConnection) {
-      if (!serviceName.empty() && (socket != NULL)) {
+      if (!serviceName.empty() && (socket != nullptr)) {
          Messaging* messaging(Messaging::getMessaging());
-         if (messaging != NULL) {
+         if (messaging != nullptr) {
             if (messaging->isServiceRegistered(serviceName)) {
                const ServiceInfo& serviceInfo =
                   messaging->getInfoForService(serviceName);
@@ -307,7 +307,7 @@ std::string Message::readSocketBytes(Socket* socket,
 //******************************************************************************
    
 bool Message::reconstitute(Socket* socket) {
-   if (socket != NULL) {
+   if (socket != nullptr) {
       
       char headerLengthPrefixBuffer[11];
       memset(headerLengthPrefixBuffer, 0, NUM_CHARS_HEADER_LENGTH+1);
@@ -518,7 +518,7 @@ std::string Message::encodeLength(std::size_t lengthBytes) {
 std::size_t Message::decodeLength(Socket* socket) {
    std::size_t lengthBytes = 0;
    
-   if (socket != NULL) {
+   if (socket != nullptr) {
       char lengthAsChars[11];
       memset(lengthAsChars, 0, NUM_CHARS_HEADER_LENGTH+1);
       if (socket->read(lengthAsChars, NUM_CHARS_HEADER_LENGTH)) {
