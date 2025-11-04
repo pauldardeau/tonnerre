@@ -55,11 +55,8 @@ void Messaging::initialize(const std::string& configFilePath)
          int servicesRegistered = 0;
          
          Messaging* messaging(new Messaging);
-         const vector<string>::const_iterator itEnd = keys.end();
-         vector<string>::const_iterator it = keys.begin();
          
-         for (; it != itEnd; it++) {
-            const string& serviceName = *it;
+         for (const auto& serviceName : keys) {
             const string& sectionName = kvpServices.getValue(serviceName);
             
             KeyValuePairs kvp;

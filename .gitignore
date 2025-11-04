@@ -1,2 +1,5 @@
 *.o
 *.so
+test/TestClient
+test/TestServer
+test/test_tonnerre
