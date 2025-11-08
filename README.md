@@ -23,8 +23,8 @@ because it's very simple and I like simple.
 
 Platforms/Compilers
 -------------------
-This project is implemented in c++ (pre-c++11). It is tested with g++
-compiler on Linux, FreeBSD, and OpenBSD.
+This project is implemented in c++20. It is tested on Linux (Ubuntu,
+Debian, and Mint), FreeBSD, and OpenBSD.
 
 Status/Maturity
 ---------------
@@ -34,7 +34,7 @@ slowly get there.
 
 C++ Standards
 -------------
-The code is intentionally pre-c++11 to provide for maximum portability.
+The code is targeted for c++20.
 
 Coding Style
 ------------
@@ -44,7 +44,7 @@ for me.
 
 What's An INI File
 ------------------
-In the 'old days', Windows computers made extensive use of INI files.
+In the old days, Windows computers made extensive use of INI files.
 This was before the system registry came along. An INI file is a
 simple text file that is composed of sections, and each section
 can have keys and values.
