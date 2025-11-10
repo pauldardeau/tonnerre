@@ -20,7 +20,7 @@ public:
     * Destructor
     */
    virtual ~MessageHandlerAdapter() {}
-   
+
    /**
     *
     * @param requestMessage
@@ -34,7 +34,7 @@ public:
                                   const std::string& requestName,
                                   const std::string& requestPayload,
                                   std::string& responsePayload) {}
-   
+
    /**
     *
     * @param requestMessage

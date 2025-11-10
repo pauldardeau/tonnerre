@@ -26,25 +26,25 @@ public:
     * @see MessageHandler()
     */
    MessageSocketServiceHandler(MessageHandler* handler);
-   
+
    /**
     * Destructor
     */
    virtual ~MessageSocketServiceHandler();
-   
+
    /**
     *
     * @param socketRequest
     * @see SocketRequest()
     */
    virtual void serviceSocket(chaudiere::SocketRequest* socketRequest);
-   
+
    /**
     * Retrieves the name of the handler. This is primarily an aid for debugging.
     * @return the name of the handler
     */
    virtual const std::string& getName() const;
-   
+
 private:
    static const std::string handlerName;
    MessageHandler* m_handler;

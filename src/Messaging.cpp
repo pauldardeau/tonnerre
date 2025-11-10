@@ -53,12 +53,12 @@ void Messaging::initialize(const std::string& configFilePath)
          vector<string> keys;
          kvpServices.getKeys(keys);
          int servicesRegistered = 0;
-         
+
          Messaging* messaging(new Messaging);
-         
+
          for (const auto& serviceName : keys) {
             const string& sectionName = kvpServices.getValue(serviceName);
-            
+
             KeyValuePairs kvp;
             if (reader.readSection(sectionName, kvp)) {
                if (kvp.hasKey(KEY_HOST) && kvp.hasKey(KEY_PORT)) {
@@ -66,9 +66,9 @@ void Messaging::initialize(const std::string& configFilePath)
                   const string& portAsString = kvp.getValue(KEY_PORT);
                   const unsigned short portValue =
                      (unsigned short) StrUtils::parseInt(portAsString);
-                  
+
                   ServiceInfo serviceInfo(serviceName, host, portValue);
-                  
+
                   if (kvp.hasKey(KEY_PERSISTENT)) {
                      const string& persistence =
                         kvp.getValue(KEY_PERSISTENT);
@@ -76,13 +76,13 @@ void Messaging::initialize(const std::string& configFilePath)
                         serviceInfo.setPersistentConnection(true);
                      }
                   }
-                  
+
                   messaging->registerService(serviceName, serviceInfo);
                   ++servicesRegistered;
                }
             }
          }
-         
+
          if (servicesRegistered > 0) {
             Messaging::setMessaging(messaging);
          }
@@ -107,7 +107,7 @@ Messaging::Messaging() :
       factory = new PthreadsThreadingFactory();
       ThreadingFactory::setThreadingFactory(factory);
    }
-   
+
    m_mutex = factory->createMutex(EMPTY);
 }
 

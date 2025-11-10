@@ -21,7 +21,7 @@ class MessageHandler
 {
 public:
    virtual ~MessageHandler() {}
-   
+
    /**
     * Handles a message with a text payload (Text type)
     * @param requestMessage the request message
@@ -52,7 +52,7 @@ public:
                                        const std::string& requestName,
                                        const chaudiere::KeyValuePairs& requestPayload,
                                        chaudiere::KeyValuePairs& responsePayload) = 0;
-   
+
 };
 
 }

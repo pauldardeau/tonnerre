@@ -36,12 +36,12 @@ public:
     * @see Socket()
     */
    static Message* reconstruct(chaudiere::Socket* socket);
-   
+
    /**
     * Default constructor (used internally)
     */
    Message();
-   
+
    /**
     * Constructs a message in anticipation of sending it
     * @param requestName the name of the message request
@@ -49,18 +49,18 @@ public:
     */
    Message(const std::string& requestName,
            MessageType messageType=MessageTypeUnknown);
-   
+
    /**
     * Copy constructor
     * @param copy the source of the copy construction
     */
    Message(const Message& copy);
-   
+
    /**
     * Destructor
     */
    ~Message();
-   
+
    /**
     * Sends a message to the specified service and disregards any response that the
     * server handler might generate.
@@ -68,7 +68,7 @@ public:
     * @return boolean indicating if message was successfully delivered
     */
    bool send(const std::string& serviceName);
-   
+
    /**
     * Sends a message and retrieves the message response (synchronous call)
     * @param serviceName the name of the service destination
@@ -76,14 +76,14 @@ public:
     * @return boolean indicating if the message was successfully delivered and a response received
     */
    bool send(const std::string& serviceName, Message& responseMessage);
-   
+
    /**
     * Copy operator
     * @param copy the source of the copy
     * @return reference to target of copy
     */
    Message& operator=(const Message& copy);
-   
+
    /**
     * Reconstitute a message by reading message state data from a socket (used internally)
     * @param socket the socket from which to read message state data
@@ -91,45 +91,45 @@ public:
     * @see Socket()
     */
    bool reconstitute(chaudiere::Socket* socket);
-   
+
    /**
     * Sets the type of the message
     * @param messageType the type of the message
     */
    void setType(MessageType messageType);
-   
+
    /**
     * Retrieves the type of the message
     * @return the message type
     */
    MessageType getType() const;
-   
+
    /**
     * Retrieves the name of the message request
     * @return the name of the message request
     */
    std::string getRequestName() const;
-   
+
    /**
     * Retrieves the key/values payload associated with the message
     * @return reference to the key/values message payload
     * @see KeyValuePairs()
     */
    const chaudiere::KeyValuePairs& getKeyValuesPayload() const;
-   
+
    /**
     * Retrieves the textual payload associated with the message
     * @return reference to the textual message payload
     */
    const std::string& getTextPayload() const;
-   
+
    /**
     * Sets the key/values payload associated with the message
     * @param kvp the new key/values payload
     * @see KeyValuePairs()
     */
    void setKeyValuesPayload(const chaudiere::KeyValuePairs& kvp);
-   
+
    /**
     * Sets the textual payload associated with the message
     * @param text the new textual payload
@@ -141,20 +141,20 @@ public:
     * @return the name of the service
     */
    const std::string& getServiceName() const;
-   
+
    /**
     * Flatten the message state to a string so that it can be sent over network connection (used internally)
     * @return string representation of message state ready to be sent over network
     */
    std::string toString() const;
-   
+
    /**
     * Flatten a KeyValuePairs object as part of flattening the Message
     * @param kvp the KeyValuePairs object whose string representation is needed
     * @return the string representation of the KeyValuePairs object
     */
    static std::string toString(const chaudiere::KeyValuePairs& kvp);
-   
+
    /**
     * Reconstitutes the state of a KeyValuePairs from the specified string
     * @param s the textual data that holds the KeyValuePairs state data
@@ -163,14 +163,14 @@ public:
     * @see KeyValuePairs()
     */
    static bool fromString(const std::string& s, chaudiere::KeyValuePairs& kvp);
-   
+
    /**
     * Encodes a length to a string so that it can be encoded in flattened message (used internally)
     * @param lengthBytes the length in bytes to encode
     * @return the string representation of the length
     */
    static std::string encodeLength(std::size_t lengthBytes);
-   
+
    /**
     * Decodes the length of the message header by reading from a socket (used internally)
     * @param socket the socket to read from
@@ -178,7 +178,7 @@ public:
     * @see Socket()
     */
    static std::size_t decodeLength(chaudiere::Socket* socket);
-   
+
    /**
     * Retrieves a socket connection for the specified service (used internally)
     * @param serviceName the name of the service whose connection is needed
@@ -193,21 +193,21 @@ public:
     */
    void returnSocketForService(const std::string& serviceName,
                                chaudiere::Socket* socket);
-                               
+
    /**
     * Sets the specified key/value pair in the headers
     * @param key the new header key
     * @param value the new header value
     */
    void setHeader(const std::string& key, const std::string& value);
-   
+
    /**
     * Determines if the specified key exists in the headers
     * @param key whose existence is being tested
     * @return boolean indicating whether the key exists in the headers
     */
    bool hasHeader(const std::string& key) const;
-   
+
    /**
     * Retrieves the header value associated with the specified key
     * @param key header key whose value is being retrieved
@@ -215,11 +215,11 @@ public:
     * @throw InvalidKeyException
     */
    const std::string& getHeader(const std::string& key) const;
-   
+
    std::string readSocketBytes(chaudiere::Socket* socket,
                                int numberBytes,
                                bool& success);
-   
+
 private:
    std::string m_serviceName;
    std::string m_textPayload;
@@ -228,7 +228,7 @@ private:
    MessageType m_messageType;
    bool m_isOneWay;
    mutable bool m_persistentConnection;
-   
+
 };
 
 }

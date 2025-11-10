@@ -40,7 +40,7 @@ MessageRequestHandler::~MessageRequestHandler() {
 void MessageRequestHandler::run() {
    Socket* socket(getSocket());
    MessageHandler* messageHandler = m_handler;
-   
+
    if ((socket != nullptr) && (messageHandler != nullptr)) {
       Message* requestMessage(Message::reconstruct(socket));
       if (requestMessage != nullptr) {
@@ -50,7 +50,7 @@ void MessageRequestHandler::run() {
             Message responseMessage(requestName, messageType);
             if (messageType == MessageTypeKeyValues) {
                KeyValuePairs responsePayload;
-               
+
                try {
                   messageHandler->handleKeyValuesMessage(*requestMessage,
                                                          responseMessage,
@@ -70,7 +70,7 @@ void MessageRequestHandler::run() {
                }
             } else if (messageType == MessageTypeText) {
                std::string responsePayload;
-               
+
                try {
                   messageHandler->handleTextMessage(*requestMessage,
                                                     responseMessage,
@@ -89,11 +89,11 @@ void MessageRequestHandler::run() {
                   Logger::error("exception caught in handling message");
                }
             }
-            
+
             if (!socket->write(responseMessage.toString())) {
                Logger::error("writing response message to socket failed");
             }
-            
+
          } else {
             // request name is empty
             Logger::error("request name is empty");
@@ -106,7 +106,7 @@ void MessageRequestHandler::run() {
       if (socket == nullptr) {
          Logger::error("no socket provided");
       }
-      
+
       if (messageHandler == nullptr) {
          Logger::error("no message handler provided");
       }

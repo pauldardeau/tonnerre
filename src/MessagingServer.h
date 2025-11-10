@@ -23,7 +23,7 @@ class MessagingServer : public chaudiere::SocketServer
 public:
    static const std::string SERVER_NAME;
    static const std::string SERVER_VERSION;
-   
+
    /**
     * Constructs a new server to receive messages
     * @param configFilePath the path to the configuration (INI) file
@@ -33,12 +33,12 @@ public:
    MessagingServer(const std::string& configFilePath,
                    const std::string& serviceName,
                    MessageHandler* handler=nullptr);
-                   
+
    /**
     * Destructor
     */
    ~MessagingServer();
-   
+
    /**
     * Sets the message handler
     * @param handler the handler to use
@@ -53,7 +53,7 @@ public:
     * @see Socket()
     */
    virtual chaudiere::RequestHandler* handlerForSocket(chaudiere::Socket* socket);
-   
+
   /**
    * Creates a request handler for the SocketRequest (used internally)
    * @param socketRequest the socket request that will be used by the new handler
@@ -69,7 +69,7 @@ public:
    * @see SocketServiceHandler()
    */
    virtual chaudiere::SocketServiceHandler* createSocketServiceHandler();
-   
+
 private:
    MessageHandler* m_handler;
    std::string m_serviceName;

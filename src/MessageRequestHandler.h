@@ -25,7 +25,7 @@ public:
     * @see MessageHandler()
     */
    MessageRequestHandler(chaudiere::Socket* socket, MessageHandler* handler);
-   
+
    /**
     *
     * @param socketRequest
@@ -35,17 +35,17 @@ public:
     */
    MessageRequestHandler(chaudiere::SocketRequest* socketRequest,
                          MessageHandler* handler);
-   
+
    /**
     * Destructor
     */
    ~MessageRequestHandler();
-   
+
    /**
     *
     */
    virtual void run();
-   
+
 private:
    MessageHandler* m_handler;
 };

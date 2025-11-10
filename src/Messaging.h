@@ -26,35 +26,35 @@ public:
     * @param messaging the Messaging object instance for messaging
     */
    static void setMessaging(Messaging* messaging);
-   
+
    /**
     * Retrieves the Messaging singleton instance
     * @return pointer to the Messaging instance, or nullptr if not initialized
     */
    static Messaging* getMessaging();
-   
+
    /**
     * Initializes the messaging system by reading the configuration file and creating a Messaging instance
     * @param configFilePath the file path to the INI configuration file
     */
    static void initialize(const std::string& configFilePath);
-   
+
    /**
     * Determines if the messaging system has been initialized
     * @return boolean indicating if messaging system has been initialized
     */
    static bool isInitialized();
-   
+
    /**
     * Default constructor
     */
    Messaging();
-   
+
    /**
     * Destructor
     */
    ~Messaging();
-   
+
    /**
     * Registers a service with its name and host/port values
     * @param serviceName the name of the service being registered
@@ -63,14 +63,14 @@ public:
     */
    void registerService(const std::string& serviceName,
                         const chaudiere::ServiceInfo& serviceInfo);
-   
+
    /**
     * Determines if the specified service name has been registered
     * @param serviceName the service name whose existence is being evaluated
     * @return boolean indicating if the service has been registered
     */
    bool isServiceRegistered(const std::string& serviceName) const;
-   
+
    /**
     * Retrieves the host and port values for the specified service name
     * @param serviceName the name of the service whose host/port values are being requested
@@ -78,7 +78,7 @@ public:
     * @see ServiceInfo()
     */
    const chaudiere::ServiceInfo& getInfoForService(const std::string& serviceName) const;
-   
+
    /**
     * Retrieve a socket connection for the specified service
     * @param serviceInfo the service for which a socket conection is desired
@@ -105,7 +105,7 @@ private:
    std::map<std::string, chaudiere::ServiceInfo> m_mapServices;
    std::map<std::string, chaudiere::Socket*> m_mapSocketConnections;
    chaudiere::Mutex* m_mutex;
-   
+
    Messaging(const Messaging&);
    Messaging& operator=(const Messaging&);
 };
