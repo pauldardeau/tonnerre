@@ -37,7 +37,7 @@ int main(int argc, char* argv[])
    StdLogger* logger = new StdLogger(Info);
    //logger->setLogInstanceLifecycles(true);
    Logger::setLogger(logger);
-   
+
    const string SERVICE_SERVER_INFO = "server_info";
    const string SERVICE_ECHO        = "echo_service";
    const string SERVICE_STOOGE_INFO = "stooge_info_service";
@@ -49,7 +49,7 @@ int main(int argc, char* argv[])
 
    try {
       Messaging::initialize("tonnerre.ini");
-   
+
       if (serviceName == SERVICE_SERVER_INFO) {
          Message message("serverInfo", MessageTypeText);
          Message response;

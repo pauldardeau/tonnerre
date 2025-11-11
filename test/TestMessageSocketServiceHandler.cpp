@@ -16,7 +16,7 @@ TestMessageSocketServiceHandler::TestMessageSocketServiceHandler() :
 
 void TestMessageSocketServiceHandler::runTests() {
    testConstructor();
-   testServiceSocket();            
+   testServiceSocket();
    testGetName();
 }
 

@@ -16,7 +16,7 @@ TestMessageRequestHandler::TestMessageRequestHandler() :
 
 void TestMessageRequestHandler::runTests() {
    testConstructorWithSocket();
-   testConstructorWithSocketRequest();            
+   testConstructorWithSocketRequest();
    testRun();
 }
 

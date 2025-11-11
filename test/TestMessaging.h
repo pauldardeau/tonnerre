@@ -15,7 +15,7 @@ protected:
    void runTests();
 
    void testSetMessaging();
-   void testGetMessaging();   
+   void testGetMessaging();
    void testInitialize();
    void testIsInitialized();
 
@@ -31,7 +31,7 @@ public:
    TestMessaging();
 
 };
-   
+
 }
 
 #endif

@@ -18,7 +18,7 @@ using namespace chaudiere;
 
 //******************************************************************************
 //******************************************************************************
-                                    
+
 class TestServerInfo : public MessageHandlerAdapter
 {
 public:
@@ -66,7 +66,7 @@ public:
    {
       if (requestName == "echo") {
          responsePayload = requestPayload;
-      }                               
+      }
    }
 };
 
@@ -83,14 +83,14 @@ public:
                                KeyValuePairs& responsePayload)
    {
       printf("StoogesInfoServer.handleKeyValuesMessage called\n");
-      
+
       if (requestName == "listStooges") {
          printf("listStooges request\n");
-         
+
          responsePayload.addPair("stooge1", "Moe");
          responsePayload.addPair("stooge2", "Larry");
          responsePayload.addPair("stooge3", "Curly");
-      }                               
+      }
    }
 };
 
@@ -108,11 +108,11 @@ int main(int argc, char* argv[])
    serviceName = SERVICE_ECHO;
    //serviceName = SERVICE_STOOGE_INFO;
    MessageHandler* handler = nullptr;
-   
+
    StdLogger* logger = new StdLogger(Info);
    //logger->setLogInstanceLifecycles(true);
    Logger::setLogger(logger);
-   
+
    if (serviceName == SERVICE_SERVER_INFO) {
       handler = new TestServerInfo();
    } else if (serviceName == SERVICE_ECHO) {
@@ -120,7 +120,7 @@ int main(int argc, char* argv[])
    } else if (serviceName == SERVICE_STOOGE_INFO) {
       handler = new StoogeInfoService();
    }
-   
+
    if (handler != nullptr) {
       printf("starting service %s\n", serviceName.c_str());
       MessagingServer server("tonnerre.ini", serviceName, handler);

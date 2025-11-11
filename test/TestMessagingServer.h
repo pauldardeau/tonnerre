@@ -24,7 +24,7 @@ public:
    TestMessagingServer();
 
 };
-   
+
 }
 
 #endif

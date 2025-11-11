@@ -15,14 +15,14 @@ protected:
    void runTests();
 
    void testConstructorWithSocket();
-   void testConstructorWithSocketRequest();   
+   void testConstructorWithSocketRequest();
    void testRun();
 
 public:
    TestMessageRequestHandler();
 
 };
-   
+
 }
 
 #endif

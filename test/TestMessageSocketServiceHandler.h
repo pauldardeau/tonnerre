@@ -15,14 +15,14 @@ protected:
    void runTests();
 
    void testConstructor();
-   void testServiceSocket();   
+   void testServiceSocket();
    void testGetName();
 
 public:
    TestMessageSocketServiceHandler();
 
 };
-   
+
 }
 
 #endif
