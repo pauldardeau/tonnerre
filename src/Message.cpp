@@ -11,7 +11,6 @@
 #include "Logger.h"
 #include "StrUtils.h"
 #include "Socket.h"
-#include "StringTokenizer.h"
 #include "Messaging.h"
 #include "CharBuffer.h"
 
@@ -479,18 +478,17 @@ bool Message::fromString(const std::string& s, KeyValuePairs& kvp) {
    int numPairsAdded = 0;
 
    if (!s.empty()) {
-      StringTokenizer stPairs(s, DELIMITER_PAIR);
-      const std::size_t numPairs = stPairs.countTokens();
+      std::vector<std::string> vecPairs = StrUtils::split(s, DELIMITER_PAIR);
+      const std::size_t numPairs = vecPairs.size();
 
       if (numPairs > 0) {
-         while (stPairs.hasMoreTokens()) {
-            const std::string& keyValuePair = stPairs.nextToken();
-
-            StringTokenizer stKeyValue(keyValuePair, DELIMITER_KEY_VALUE);
-            const std::size_t numTokens = stKeyValue.countTokens();
+         for (const std::string& keyValuePair : vecPairs) {
+            std::vector<std::string> vecKeyValue =
+               StrUtils::split(keyValuePair, DELIMITER_KEY_VALUE);
+            const std::size_t numTokens = vecKeyValue.size();
             if (numTokens == 2) {
-               const std::string& key = stKeyValue.nextToken();
-               const std::string& value = stKeyValue.nextToken();
+               const std::string& key = vecKeyValue[0];
+               const std::string& value = vecKeyValue[1];
                kvp.addPair(key, value);
                ++numPairsAdded;
             }
