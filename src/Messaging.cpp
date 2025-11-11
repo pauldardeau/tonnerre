@@ -108,7 +108,7 @@ Messaging::Messaging() :
       ThreadingFactory::setThreadingFactory(factory);
    }
 
-   m_mutex = factory->createMutex(EMPTY);
+   m_mutex.reset(factory->createMutex(EMPTY));
 }
 
 //******************************************************************************

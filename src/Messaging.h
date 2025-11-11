@@ -4,6 +4,7 @@
 #ifndef TONNERRE_MESSAGING_H
 #define TONNERRE_MESSAGING_H
 
+#include <memory>
 #include <string>
 #include <map>
 
@@ -104,7 +105,7 @@ private:
    static Messaging* messagingInstance;
    std::map<std::string, chaudiere::ServiceInfo> m_mapServices;
    std::map<std::string, chaudiere::Socket*> m_mapSocketConnections;
-   chaudiere::Mutex* m_mutex;
+   std::unique_ptr<chaudiere::Mutex> m_mutex;
 
    Messaging(const Messaging&);
    Messaging& operator=(const Messaging&);
