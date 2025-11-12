@@ -19,7 +19,7 @@ jobs:
       - name: make chaudiere
         run: make
         working-directory: chaudiere/src
-      - name make library
+      - name: make library
         run: make
         working-directory: src
       - name: make tests
