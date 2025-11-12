@@ -1,3 +1,5 @@
+[![Build and test](https://github.com/pauldardeau/tonnerre/actions/workflows/build-and-test-cpp.yml/badge.svg)](https://github.com/pauldardeau/tonnerre/actions/workflows/build-and-test-cpp.yml)
+
 tonnerre
 ========
 
@@ -14,11 +16,11 @@ BSD
 Dependencies
 ------------
 Chaudière - C++ core functionality with sockets, threading, configuration, etc.
+Poivre - c++ unit tests
 
 Configuration File
 ------------------
-Tonnerre uses an .INI for configuration. See 'What's an INI file'
-if you're not familiar with them. The .INI format was chosen
+Tonnerre uses an .INI for configuration. The .INI format was chosen
 because it's very simple and I like simple.
 
 Platforms/Compilers
@@ -26,28 +28,9 @@ Platforms/Compilers
 This project is implemented in c++20. It is tested on Linux (Ubuntu,
 Debian, and Mint), FreeBSD, and OpenBSD.
 
-Status/Maturity
----------------
-Parts of the code are very mature and well tested, and other parts
-aren't. I wouldn't use this for anything important just yet. It'll
-slowly get there.
-
 C++ Standards
 -------------
 The code is targeted for c++20.
-
-Coding Style
-------------
-You may find my coding style slightly peculiar. It's my personal style
-that I've adopted after a lot of experimentation about what works best
-for me.
-
-What's An INI File
-------------------
-In the old days, Windows computers made extensive use of INI files.
-This was before the system registry came along. An INI file is a
-simple text file that is composed of sections, and each section
-can have keys and values.
 
 Meaning of Tonnerre
 -------------------
