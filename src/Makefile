@@ -2,7 +2,7 @@
 # BSD License
 
 CC = c++
-CC_OPTS = -c -Wall -fPIC -O2 -I../../chaudiere/src
+CC_OPTS = -c -Wall -fPIC -O2 -I../chaudiere/src
 
 LIB_NAME = tonnerre.so
 
