@@ -1,0 +1,30 @@
+name: Build and test
+on:
+  push:
+    branches: [ "master" ]
+  pull_request:
+    branches: [ "master" ]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          submodules: true
+      - name: make poivre
+        run: make
+        working-directory: chaudiere/poivre
+      - name: make chaudiere
+        run: make
+        working-directory: chaudiere/src
+      - name make library
+        run: make
+        working-directory: src
+      - name: make tests
+        run: make
+        working-directory: test
+      - name: run-tests
+        run: ./test_tonnerre
+        working-directory: test
