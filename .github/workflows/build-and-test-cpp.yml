@@ -13,9 +13,6 @@ jobs:
         uses: actions/checkout@v4
         with:
           submodules: recursive
-      - name: make poivre
-        run: make
-        working-directory: chaudiere/poivre
       - name: make chaudiere
         run: make
         working-directory: chaudiere/src
