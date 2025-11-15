@@ -12,7 +12,7 @@ using namespace tonnerre;
 
 //******************************************************************************
 
-void run_test(poivre::TestSuite* test_suite) {
+void run_test(chaudiere::TestSuite* test_suite) {
    if (nullptr != test_suite) {
       test_suite->run();
       delete test_suite;

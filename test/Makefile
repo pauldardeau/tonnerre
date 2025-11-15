@@ -3,13 +3,13 @@
 
 CC = c++
 CC_OPTS = -c -pthread -I../src -I../chaudiere/src
-UT_CC_OPTS = $(CC_OPTS) -I../chaudiere/poivre
+UT_CC_OPTS = $(CC_OPTS)
 
 CLIENT_EXE = TestClient
 SERVER_EXE = TestServer
 UNIT_TESTS_EXE = test_tonnerre
 LIB_NAMES = ../src/tonnerre.so ../chaudiere/src/libchaudiere.so
-UT_LIBS = $(LIB_NAMES) ../chaudiere/poivre/poivre.so
+UT_LIBS = $(LIB_NAMES)
 STD_LINK_LIBS = -lpthread -ldl
 
 CLIENT_EXE_OBJS = TestClient.o

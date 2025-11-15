@@ -9,7 +9,7 @@
 
 namespace tonnerre {
 
-class TestMessageRequestHandler : public poivre::TestSuite {
+class TestMessageRequestHandler : public chaudiere::TestSuite {
 
 protected:
    void runTests();
