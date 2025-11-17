@@ -502,11 +502,7 @@ bool Message::fromString(const std::string& s, KeyValuePairs& kvp) {
 //******************************************************************************
 
 std::string Message::encodeLength(std::size_t lengthBytes) {
-   char lengthAsChars[11];
-   ::memset(lengthAsChars, 0, NUM_CHARS_HEADER_LENGTH+1);
-   //TODO: create StrUtils::toString(std::size_t) and use it here
-   ::snprintf(lengthAsChars, NUM_CHARS_HEADER_LENGTH, "%zu", lengthBytes);
-   return std::string(lengthAsChars);
+   return StrUtils::size_tToString(lengthBytes);
 }
 
 //******************************************************************************
