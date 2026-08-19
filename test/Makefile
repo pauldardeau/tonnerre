@@ -3,7 +3,7 @@
 
 CC = c++
 CC_OPTS = -c -pthread -I../src -I../chaudiere/src
-UT_CC_OPTS = $(CC_OPTS)
+UT_CC_OPTS = -c -std=c++20 -pthread -I../src -I../chaudiere/src -I../poivre
 
 CLIENT_EXE = TestClient
 SERVER_EXE = TestServer
@@ -16,7 +16,10 @@ CLIENT_EXE_OBJS = TestClient.o
 
 SERVER_EXE_OBJS = TestServer.o
 
-UNIT_TESTS_EXE_OBJS = Tests.o TestMessaging.o TestMessagingServer.o TestMessage.o TestMessageRequestHandler.o TestMessageSocketServiceHandler.o
+POIVRE_OBJS = TestCase.o \
+TestSuite.o
+
+UNIT_TESTS_EXE_OBJS = Tests.o TestMessaging.o TestMessagingServer.o TestMessage.o TestMessageRequestHandler.o TestMessageSocketServiceHandler.o $(POIVRE_OBJS)
 
 all : $(CLIENT_EXE) $(SERVER_EXE) $(UNIT_TESTS_EXE)
 
@@ -35,6 +38,11 @@ $(SERVER_EXE) : $(SERVER_EXE_OBJS)
 $(UNIT_TESTS_EXE) : $(UNIT_TESTS_EXE_OBJS)
 	$(CC) $(UNIT_TESTS_EXE_OBJS) -o $(UNIT_TESTS_EXE) $(UT_LIBS) $(STD_LINK_LIBS)
 
+$(POIVRE_OBJS) : %.o : ../poivre/%.cpp
+	$(CC) $(UT_CC_OPTS) $< -o $@
+
+TestClient.o TestServer.o : %.o : %.cpp
+	$(CC) $(CC_OPTS) $< -o $@
 
 %.o : %.cpp
 	$(CC) $(UT_CC_OPTS) $< -o $@

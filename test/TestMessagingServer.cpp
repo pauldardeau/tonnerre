@@ -8,7 +8,7 @@ using namespace tonnerre;
 //******************************************************************************
 
 TestMessagingServer::TestMessagingServer() :
-   TestSuite("TestMessagingServer") {
+   poivre::TestSuite("TestMessagingServer") {
 }
 
 //******************************************************************************

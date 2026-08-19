@@ -9,7 +9,7 @@ using namespace tonnerre;
 //******************************************************************************
 
 TestMessageRequestHandler::TestMessageRequestHandler() :
-   TestSuite("TestMessageRequestHandler") {
+   poivre::TestSuite("TestMessageRequestHandler") {
 }
 
 //******************************************************************************
