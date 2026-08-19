@@ -25,20 +25,27 @@ static const std::string VALUE_TRUE      = "true";
 static const std::string EMPTY           = "";
 
 
-Messaging* Messaging::messagingInstance = nullptr;
+std::shared_ptr<Messaging> Messaging::messagingInstance;
 
 //******************************************************************************
 
+// messagingInstance is accessed via std::atomic_load/atomic_store rather
+// than a plain pointer, so concurrent setMessaging()/getMessaging() calls
+// from different threads don't race on the pointer itself (the same
+// pattern used for chaudiere::Logger::loggerInstance). std::atomic_store
+// also means a prior instance is now actually released when replaced,
+// rather than leaked as it was with the raw pointer.
+
 void Messaging::setMessaging(Messaging* messaging)
 {
-   messagingInstance = messaging;
+   std::atomic_store(&messagingInstance, std::shared_ptr<Messaging>(messaging));
 }
 
 //******************************************************************************
 
-Messaging* Messaging::getMessaging()
+std::shared_ptr<Messaging> Messaging::getMessaging()
 {
-   return messagingInstance;
+   return std::atomic_load(&messagingInstance);
 }
 
 //******************************************************************************
@@ -122,6 +129,7 @@ Messaging::~Messaging()
 void Messaging::registerService(const std::string& serviceName,
                                 const ServiceInfo& serviceInfo)
 {
+   MutexLock lock(*m_mutex);
    m_mapServices[serviceName] = serviceInfo;
 }
 
@@ -129,20 +137,21 @@ void Messaging::registerService(const std::string& serviceName,
 
 bool Messaging::isServiceRegistered(const std::string& serviceName) const
 {
+   MutexLock lock(*m_mutex);
    return (m_mapServices.find(serviceName) != m_mapServices.end());
 }
 
 //******************************************************************************
 
-const ServiceInfo& Messaging::getInfoForService(const std::string& serviceName) const
+ServiceInfo Messaging::getInfoForService(const std::string& serviceName) const
 {
+   MutexLock lock(*m_mutex);
    const map<string,ServiceInfo>::const_iterator it =
       m_mapServices.find(serviceName);
    if (it != m_mapServices.end()) {
       return (*it).second;
    } else {
       throw InvalidKeyException(serviceName);
-      return (*it).second;
    }
 }
 

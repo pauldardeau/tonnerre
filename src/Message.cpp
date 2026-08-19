@@ -1,6 +1,7 @@
 // Copyright Paul Dardeau, SwampBits LLC 2014
 // BSD License
 
+#include <memory>
 #include <string>
 #include <vector>
 #include <stdio.h>
@@ -218,7 +219,7 @@ std::string Message::getRequestName() const {
 //******************************************************************************
 
 Socket* Message::socketForService(const std::string& serviceName) const {
-   Messaging* messaging(Messaging::getMessaging());
+   std::shared_ptr<Messaging> messaging(Messaging::getMessaging());
 
    if (messaging != nullptr) {
       if (messaging->isServiceRegistered(serviceName)) {
@@ -252,7 +253,7 @@ void Message::returnSocketForService(const std::string& serviceName,
    }
 
    if (m_persistentConnection && !serviceName.empty()) {
-      Messaging* messaging(Messaging::getMessaging());
+      std::shared_ptr<Messaging> messaging(Messaging::getMessaging());
       if (messaging != nullptr) {
          if (messaging->isServiceRegistered(serviceName)) {
             const ServiceInfo& serviceInfo =

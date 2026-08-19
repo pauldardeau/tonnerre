@@ -29,10 +29,13 @@ public:
    static void setMessaging(Messaging* messaging);
 
    /**
-    * Retrieves the Messaging singleton instance
-    * @return pointer to the Messaging instance, or nullptr if not initialized
+    * Retrieves the Messaging singleton instance. Returned as a shared_ptr
+    * (rather than a raw pointer) so the caller keeps the instance alive
+    * for as long as it holds the return value, even if another thread
+    * concurrently calls setMessaging() and replaces the singleton.
+    * @return the Messaging instance, or an empty/null shared_ptr if not initialized
     */
-   static Messaging* getMessaging();
+   static std::shared_ptr<Messaging> getMessaging();
 
    /**
     * Initializes the messaging system by reading the configuration file and creating a Messaging instance
@@ -73,12 +76,16 @@ public:
    bool isServiceRegistered(const std::string& serviceName) const;
 
    /**
-    * Retrieves the host and port values for the specified service name
+    * Retrieves the host and port values for the specified service name.
+    * Returned by value (rather than by reference) so the caller gets an
+    * independent copy: a reference into m_mapServices would only be
+    * valid while m_mutex is held, but m_mutex is released as soon as
+    * this call returns.
     * @param serviceName the name of the service whose host/port values are being requested
     * @return object holding the host/port values for the service
     * @see ServiceInfo()
     */
-   const chaudiere::ServiceInfo& getInfoForService(const std::string& serviceName) const;
+   chaudiere::ServiceInfo getInfoForService(const std::string& serviceName) const;
 
    /**
     * Retrieve a socket connection for the specified service
@@ -102,7 +109,7 @@ public:
 
 
 private:
-   static Messaging* messagingInstance;
+   static std::shared_ptr<Messaging> messagingInstance;
    std::map<std::string, chaudiere::ServiceInfo> m_mapServices;
    std::map<std::string, chaudiere::Socket*> m_mapSocketConnections;
    std::unique_ptr<chaudiere::Mutex> m_mutex;
