@@ -172,6 +172,12 @@ bool Message::send(const std::string& serviceName, Message& responseMessage) {
 
 //******************************************************************************
 
+void Message::setType(MessageType messageType) {
+   m_messageType = messageType;
+}
+
+//******************************************************************************
+
 MessageType Message::getType() const {
    return m_messageType;
 }
@@ -522,7 +528,9 @@ std::size_t Message::decodeLength(Socket* socket) {
       char lengthAsChars[11];
       memset(lengthAsChars, 0, NUM_CHARS_HEADER_LENGTH+1);
       if (socket->read(lengthAsChars, NUM_CHARS_HEADER_LENGTH)) {
-         return StrUtils::parseLong(string(lengthAsChars));
+         std::string lengthPrefix = lengthAsChars;
+         StrUtils::stripTrailing(lengthPrefix, ' ');
+         return StrUtils::parseLong(lengthPrefix);
       }
    }
 
