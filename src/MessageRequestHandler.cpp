@@ -1,6 +1,8 @@
 // Copyright Paul Dardeau, SwampBits LLC 2014
 // BSD License
 
+#include <memory>
+
 #include "MessageRequestHandler.h"
 #include "MessageHandler.h"
 #include "BasicException.h"
@@ -42,7 +44,7 @@ void MessageRequestHandler::run() {
    MessageHandler* messageHandler = m_handler;
 
    if ((socket != nullptr) && (messageHandler != nullptr)) {
-      Message* requestMessage(Message::reconstruct(socket));
+      std::unique_ptr<Message> requestMessage(Message::reconstruct(socket));
       if (requestMessage != nullptr) {
          const std::string& requestName = requestMessage->getRequestName();
          if (!requestName.empty()) {

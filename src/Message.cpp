@@ -247,20 +247,27 @@ Socket* Message::socketForService(const std::string& serviceName) const {
 
 void Message::returnSocketForService(const std::string& serviceName,
                                      chaudiere::Socket* socket) {
-   if (m_persistentConnection) {
-      if (!serviceName.empty() && (socket != nullptr)) {
-         Messaging* messaging(Messaging::getMessaging());
-         if (messaging != nullptr) {
-            if (messaging->isServiceRegistered(serviceName)) {
-               const ServiceInfo& serviceInfo =
-                  messaging->getInfoForService(serviceName);
-               if (serviceInfo.getPersistentConnection()) {
-                  messaging->returnSocketForService(serviceInfo, socket);
-               }
+   if (socket == nullptr) {
+      return;
+   }
+
+   if (m_persistentConnection && !serviceName.empty()) {
+      Messaging* messaging(Messaging::getMessaging());
+      if (messaging != nullptr) {
+         if (messaging->isServiceRegistered(serviceName)) {
+            const ServiceInfo& serviceInfo =
+               messaging->getInfoForService(serviceName);
+            if (serviceInfo.getPersistentConnection()) {
+               messaging->returnSocketForService(serviceInfo, socket);
+               return;
             }
          }
       }
    }
+
+   // not a persistent connection (or unable to pool it) -- close it
+   // rather than leaking the fd
+   delete socket;
 }
 
 //******************************************************************************
