@@ -42,6 +42,27 @@ Your own programs need `-I` for both `src/` and `chaudiere/src/`, and link
 against `tonnerre.so` and `chaudiere/src/libchaudiere.so` (see `test/Makefile`
 for the exact flags).
 
+### Building with CMake
+
+A `CMakeLists.txt` is also provided:
+
+```bash
+cmake -S . -B build
+cmake --build build
+ctest --test-dir build --output-on-failure   # builds and runs test_tonnerre
+```
+
+To depend on tonnerre from another CMake project - vendored as a git submodule:
+
+```cmake
+add_subdirectory(tonnerre)
+target_link_libraries(my_target PRIVATE tonnerre)
+```
+
+No `-I` needed - the include directory, chaudière (linked transitively), and C++20 all
+propagate automatically. The Makefile isn't going anywhere; both build systems compile the
+same sources.
+
 Configuration File
 ------------------
 Tonnerre uses an .INI for configuration. The .INI format was chosen

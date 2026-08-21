@@ -3,3 +3,6 @@
 test/TestClient
 test/TestServer
 test/test_tonnerre
+
+# CMake out-of-source build directory
+/build/
