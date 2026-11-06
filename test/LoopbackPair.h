@@ -14,6 +14,11 @@
 namespace tonnerre_test {
 
 /**
+ * Both ends set SO_REUSEADDR: the established suites listen on fixed ports that
+ * lie inside the kernel's ephemeral range, and a lingering TIME_WAIT left by a
+ * client socket without SO_REUSEADDR that happened to be assigned one of those
+ * ports would make their bind() fail with EADDRINUSE for about a minute.
+ *
  * A connected TCP pair on 127.0.0.1 using an ephemeral port chosen by the
  * kernel (no fixed port, nothing outside loopback). serverFd is the accepted
  * end (to be handed to chaudiere::Socket); peerFd is the connecting end that
@@ -24,11 +29,17 @@ struct LoopbackPair {
    int serverFd = -1;
    int peerFd = -1;
 
+   static void allowAddressReuse(int fd) {
+      const int on = 1;
+      ::setsockopt(fd, SOL_SOCKET, SO_REUSEADDR, &on, sizeof(on));
+   }
+
    bool create() {
       const int listenFd = ::socket(AF_INET, SOCK_STREAM, 0);
       if (listenFd < 0) {
          return false;
       }
+      allowAddressReuse(listenFd);
 
       sockaddr_in addr;
       std::memset(&addr, 0, sizeof(addr));
@@ -49,6 +60,7 @@ struct LoopbackPair {
          ::close(listenFd);
          return false;
       }
+      allowAddressReuse(peerFd);
 
       // the connection completes against the listen backlog before accept()
       if (::connect(peerFd, reinterpret_cast<sockaddr*>(&addr), sizeof(addr)) != 0) {

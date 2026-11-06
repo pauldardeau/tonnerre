@@ -92,7 +92,12 @@ void MessageRequestHandler::run() {
                }
             }
 
-            if (!socket->write(responseMessage.toString())) {
+            // a response larger than the receiver accepts is not sent; the
+            // connection is closed when this request completes
+            std::string responseWire;
+            if (!responseMessage.toWireString(responseWire)) {
+               Logger::error("response message exceeds the maximum message size, not sent");
+            } else if (!socket->write(responseWire)) {
                Logger::error("writing response message to socket failed");
             }
 

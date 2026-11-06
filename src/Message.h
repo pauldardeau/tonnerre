@@ -30,9 +30,11 @@ class Message
 {
 public:
    /**
-    * Reconstructs a message by reading from a socket
+    * Reconstructs a message by reading from a socket. On failure the socket
+    * has been closed; see reconstitute().
     * @param socket the socket to read from
-    * @return a new Message object instance constructed by reading data from socket
+    * @return a new Message object instance constructed by reading data from socket,
+    * or nullptr if a complete, valid message was not received
     * @see Socket()
     */
    static Message* reconstruct(chaudiere::Socket* socket);
@@ -63,14 +65,18 @@ public:
 
    /**
     * Sends a message to the specified service and disregards any response that the
-    * server handler might generate.
+    * server handler might generate. A message whose header or payload exceeds
+    * 32,767 bytes is not sent.
     * @param serviceName the name of the service destination
     * @return boolean indicating if message was successfully delivered
     */
    bool send(const std::string& serviceName);
 
    /**
-    * Sends a message and retrieves the message response (synchronous call)
+    * Sends a message and retrieves the message response (synchronous call).
+    * A message whose header or payload exceeds 32,767 bytes is not sent. If the
+    * response is not received completely and validly, the connection is closed
+    * and discarded rather than returned to the connection pool.
     * @param serviceName the name of the service destination
     * @param responseMessage the message object instance to populate with the response
     * @return boolean indicating if the message was successfully delivered and a response received
@@ -85,7 +91,23 @@ public:
    Message& operator=(const Message& copy);
 
    /**
-    * Reconstitute a message by reading message state data from a socket (used internally)
+    * Reconstitute a message by reading message state data from a socket (used internally).
+    *
+    * The message is read with exact-length reads: the 10-character header-length
+    * prefix, the header, and then the payload, each of which must arrive in full.
+    * Header and payload are each limited to 32,767 bytes. The call returns false,
+    * and never throws for malformed input, when the prefix or a length is not a
+    * valid decimal number or exceeds its limit, when payload_type or payload_length
+    * is missing or invalid, when a header pair is malformed, or when the peer
+    * closes or the connection fails before the message is complete.
+    *
+    * On success the message's state is replaced by the received message. On
+    * failure the message is left empty (type MessageTypeUnknown, no headers, no
+    * payload) and the socket has been closed (Socket::close()): the unread
+    * remainder of the stream cannot be trusted to begin at a message boundary, so
+    * a connection on which reconstitute() has returned false must not be reused
+    * or returned to a pool. Callers detect this with Socket::isConnected(), and
+    * simply delete the socket.
     * @param socket the socket from which to read message state data
     * @return boolean indicating whether the message was successfully reconstituted
     * @see Socket()
@@ -216,11 +238,29 @@ public:
     */
    const std::string& getHeader(const std::string& key) const;
 
+   /**
+    * Reads exactly numberBytes bytes from the socket (used internally)
+    * @param socket the socket to read from
+    * @param numberBytes the number of bytes to read, 0 to 32,767
+    * @param success set true only if all numberBytes bytes were received; false
+    * for a negative or oversized count, a short read, end-of-stream or an error
+    * @return the bytes read (empty if success is false)
+    */
    std::string readSocketBytes(chaudiere::Socket* socket,
                                int numberBytes,
                                bool& success);
 
 private:
+   // MessageRequestHandler must not send a response the client would reject
+   friend class MessageRequestHandler;
+
+   // flattens the message like toString(); returns false if the header or the
+   // payload exceeds the size limit that receivers enforce
+   bool toWireString(std::string& messageAsString) const;
+
+   // returns the message to its empty state
+   void clearReceivedState();
+
    std::string m_serviceName;
    std::string m_textPayload;
    chaudiere::KeyValuePairs m_kvpPayload;

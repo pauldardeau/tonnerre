@@ -1,7 +1,9 @@
 // Copyright Paul Dardeau, SwampBits LLC 2014
 // BSD License
 
+#include <limits>
 #include <memory>
+#include <set>
 #include <string>
 #include <vector>
 #include <stdio.h>
@@ -13,7 +15,6 @@
 #include "StrUtils.h"
 #include "Socket.h"
 #include "Messaging.h"
-#include "CharBuffer.h"
 
 using namespace std;
 using namespace chaudiere;
@@ -22,8 +23,10 @@ using namespace tonnerre;
 
 static const std::string EMPTY_STRING           = "";
 
-static const int MAX_STACK_BUFFER_SIZE          = 4096;
-static const int MAX_SEGMENT_LENGTH             = 32767;
+// largest header and largest payload that will be sent or accepted; both limits
+// are enforced identically when sending and when receiving
+static const std::size_t MAX_HEADER_LENGTH      = 32767;
+static const std::size_t MAX_PAYLOAD_LENGTH     = 32767;
 
 static const int NUM_CHARS_HEADER_LENGTH        = 10;
 
@@ -42,6 +45,123 @@ static const std::string VALUE_TRUE             = "true";
 
 using namespace chaudiere;
 using namespace tonnerre;
+
+//******************************************************************************
+
+namespace {
+
+// Parses a length that arrived over the wire: one or more ASCII digits and
+// nothing else (no sign, blanks, radix prefix, exponent or decimal point).
+// Returns false, leaving 'value' untouched, for anything else and for values
+// that do not fit in a std::size_t. Never throws.
+bool parseWireLength(const std::string& text, std::size_t& value) {
+   if (text.empty()) {
+      return false;
+   }
+
+   const std::size_t maxValue = std::numeric_limits<std::size_t>::max();
+   std::size_t result = 0;
+
+   for (const char c : text) {
+      if ((c < '0') || (c > '9')) {
+         return false;
+      }
+
+      const std::size_t digit = static_cast<std::size_t>(c - '0');
+      if (result > ((maxValue - digit) / 10)) {
+         return false;
+      }
+      result = (result * 10) + digit;
+   }
+
+   value = result;
+   return true;
+}
+
+// Reads exactly 'count' bytes from the socket. Socket::readSocket() returns
+// the number of bytes actually received, which is short when the peer closes
+// or the connection fails mid-read (and -1 when nothing could be read), so the
+// read succeeded only if that number equals the number requested. The caller
+// must already have checked 'count' against a protocol limit; the check here
+// only guarantees the count can be handed to readSocket() as an int.
+bool readExact(Socket* socket, std::size_t count, std::string& bytes) {
+   bytes.clear();
+
+   if (count == 0) {
+      return true;
+   }
+
+   if (count > static_cast<std::size_t>(std::numeric_limits<int>::max())) {
+      return false;
+   }
+
+   std::string buffer(count, '\0');
+   const int requested = static_cast<int>(count);
+   const int received = socket->readSocket(&buffer[0], requested);
+
+   if (received != requested) {
+      return false;
+   }
+
+   bytes.swap(buffer);
+   return true;
+}
+
+// Strictly parses a flattened header ("key=value;key=value"). Every pair must
+// be exactly "key=value" with a non-empty key and a value that contains no
+// further '='; empty pairs and repeated keys are malformed. A pair with an
+// empty value ("request=") is what the sender writes for an empty value and
+// is accepted, but, as before, is not stored.
+bool parseHeaders(const std::string& text,
+                  KeyValuePairs& headers,
+                  std::string& problem) {
+   std::set<std::string> keysSeen;
+   std::size_t position = 0;
+
+   while (true) {
+      const std::size_t end = text.find(DELIMITER_PAIR, position);
+      const std::string pair =
+         text.substr(position,
+                     (end == std::string::npos) ? std::string::npos : end - position);
+
+      const std::size_t equals = pair.find(DELIMITER_KEY_VALUE);
+      if (equals == std::string::npos) {
+         problem = "header pair has no '='";
+         return false;
+      }
+
+      const std::string key = pair.substr(0, equals);
+      const std::string value = pair.substr(equals + 1);
+
+      if (key.empty()) {
+         problem = "header pair has an empty key";
+         return false;
+      }
+
+      if (value.find(DELIMITER_KEY_VALUE) != std::string::npos) {
+         problem = "header pair has more than one '='";
+         return false;
+      }
+
+      if (!keysSeen.insert(key).second) {
+         problem = "header key '" + key + "' is repeated";
+         return false;
+      }
+
+      if (!value.empty()) {
+         headers.addPair(key, value);
+      }
+
+      if (end == std::string::npos) {
+         break;
+      }
+      position = end + 1;
+   }
+
+   return true;
+}
+
+}
 
 //******************************************************************************
 
@@ -119,20 +239,28 @@ bool Message::send(const std::string& serviceName) {
       return false;
    }
 
+   m_isOneWay = true;
+
+   std::string wireMessage;
+   if (!toWireString(wireMessage)) {
+      Logger::error("unable to send message, it exceeds the maximum message size");
+      return false;
+   }
+
    Socket* socket(socketForService(serviceName));
 
    if (socket != nullptr) {
-      m_isOneWay = true;
-
-      if (socket->write(toString())) {
+      if (socket->write(wireMessage)) {
          returnSocketForService(serviceName, socket);
          return true;
       } else {
-         // unable to write to socket
+         // unable to write to socket; part of the message may have been
+         // written, so the stream is no longer at a message boundary and the
+         // connection must not be reused
          Logger::error("unable to write to socket");
       }
 
-      returnSocketForService(serviceName, socket);
+      delete socket;
    } else {
       // unable to connect to service
       Logger::error("unable to connect to service");
@@ -149,19 +277,29 @@ bool Message::send(const std::string& serviceName, Message& responseMessage) {
       return false;
    }
 
+   std::string wireMessage;
+   if (!toWireString(wireMessage)) {
+      Logger::error("unable to send message, it exceeds the maximum message size");
+      return false;
+   }
+
    Socket* socket(socketForService(serviceName));
 
    if (socket != nullptr) {
-      if (socket->write(toString())) {
+      if (socket->write(wireMessage)) {
+         // a failed reconstitute() closes the connection, and
+         // returnSocketForService() does not pool a closed socket
          const bool rc = responseMessage.reconstitute(socket);
          returnSocketForService(serviceName, socket);
          return rc;
       } else {
-         // unable to write to socket
+         // unable to write to socket; part of the message may have been
+         // written, so the stream is no longer at a message boundary and the
+         // connection must not be reused
          Logger::error("unable to write to socket");
       }
 
-      returnSocketForService(serviceName, socket);
+      delete socket;
    } else {
       // unable to connect to service
       Logger::error("unable to connect to service");
@@ -258,7 +396,9 @@ void Message::returnSocketForService(const std::string& serviceName,
       return;
    }
 
-   if (m_persistentConnection && !serviceName.empty()) {
+   // a closed socket (reconstitute() closes the connection when framing fails)
+   // is never pooled
+   if (m_persistentConnection && !serviceName.empty() && socket->isConnected()) {
       std::shared_ptr<Messaging> messaging(Messaging::getMessaging());
       if (messaging != nullptr) {
          if (messaging->isServiceRegistered(serviceName)) {
@@ -282,143 +422,172 @@ void Message::returnSocketForService(const std::string& serviceName,
 std::string Message::readSocketBytes(Socket* socket,
                                      int numberBytes,
                                      bool& success) {
-   if (numberBytes < MAX_STACK_BUFFER_SIZE) {
-      char stackBuffer[MAX_STACK_BUFFER_SIZE];
-      memset(stackBuffer, 0, MAX_STACK_BUFFER_SIZE);
+   std::string bytes;
 
-      if (socket->readSocket(stackBuffer, numberBytes)) {
-         stackBuffer[numberBytes] = '\0';
-         success = true;
-         return std::string(stackBuffer);
-      } else {
-         Logger::error("reading socket for header failed");
-         success = false;
-         return EMPTY_STRING;
-      }
-   } else {
-      if (numberBytes <= MAX_SEGMENT_LENGTH) {
-         std::string returnValue;
-         CharBuffer heapBuffer(numberBytes+1);
-         if (socket->readSocket(heapBuffer.data(), numberBytes)) {
-            heapBuffer.nullAt(numberBytes);
-            success = true;
-            returnValue = heapBuffer.data();
-         } else {
-            Logger::error("reading socket for header failed");
-            success = false;
-         }
+   success = (socket != nullptr) &&
+             (numberBytes >= 0) &&
+             readExact(socket, static_cast<std::size_t>(numberBytes), bytes);
 
-         return returnValue;
-      } else {
-         Logger::error("header length exceeds 32K");
-         success = false;
-         return EMPTY_STRING;
-      }
+   if (!success) {
+      Logger::error("reading socket failed, the requested bytes did not arrive");
+      bytes.clear();
    }
+
+   return bytes;
+}
+
+//******************************************************************************
+
+void Message::clearReceivedState() {
+   m_kvpHeaders.clear();
+   m_textPayload.clear();
+   m_kvpPayload.clear();
+   m_messageType = MessageTypeUnknown;
+   m_isOneWay = false;
 }
 
 //******************************************************************************
 
 bool Message::reconstitute(Socket* socket) {
-   if (socket != nullptr) {
-
-      char headerLengthPrefixBuffer[11];
-      memset(headerLengthPrefixBuffer, 0, NUM_CHARS_HEADER_LENGTH+1);
-
-      if (socket->readSocket(headerLengthPrefixBuffer, NUM_CHARS_HEADER_LENGTH)) {
-         headerLengthPrefixBuffer[NUM_CHARS_HEADER_LENGTH] = '\0';
-
-         std::string headerLengthPrefix = headerLengthPrefixBuffer;
-         StrUtils::stripTrailing(headerLengthPrefix, ' ');
-         const std::size_t headerLength =
-            StrUtils::parseLong(headerLengthPrefix);
-
-         if (headerLength > 0) {
-            bool headerRead = false;
-            std::string headerAsString =
-               readSocketBytes(socket, headerLength, headerRead);
-
-            if (headerRead && !headerAsString.empty()) {
-               if (fromString(headerAsString, m_kvpHeaders)) {
-                  if (m_kvpHeaders.hasKey(KEY_PAYLOAD_TYPE)) {
-                     const std::string& valuePayloadType =
-                        m_kvpHeaders.getValue(KEY_PAYLOAD_TYPE);
-
-                     if (valuePayloadType == VALUE_PAYLOAD_TEXT) {
-                        m_messageType = MessageTypeText;
-                     } else if (valuePayloadType == VALUE_PAYLOAD_KVP) {
-                        m_messageType = MessageTypeKeyValues;
-                     } else {
-                        Logger::error("unrecognized payload type");
-                     }
-                  }
-
-                  if (m_messageType == MessageTypeUnknown) {
-                     Logger::error("unable to identify message type from header");
-                     return false;
-                  }
-
-                  if (m_kvpHeaders.hasKey(KEY_PAYLOAD_LENGTH)) {
-                     const std::string& valuePayloadLength =
-                        m_kvpHeaders.getValue(KEY_PAYLOAD_LENGTH);
-
-                     if (!valuePayloadLength.empty()) {
-                        const std::size_t payloadLength =
-                           StrUtils::parseLong(valuePayloadLength);
-
-                        if (payloadLength > 0) {
-                           bool payloadRead = false;
-                           std::string payloadAsString =
-                              readSocketBytes(socket, payloadLength, payloadRead);
-
-                           if (payloadRead && !payloadAsString.empty()) {
-                              if (m_messageType == MessageTypeText) {
-                                 m_textPayload = payloadAsString;
-                              } else if (m_messageType == MessageTypeKeyValues) {
-                                 fromString(payloadAsString, m_kvpPayload);
-                              }
-                           }
-                        }
-                     }
-                  }
-
-                  if (m_kvpHeaders.hasKey(KEY_ONE_WAY)) {
-                     const std::string& valueOneWay =
-                        m_kvpHeaders.getValue(KEY_ONE_WAY);
-                     if (valueOneWay == VALUE_TRUE) {
-                        // mark it as being a 1-way message
-                        m_isOneWay = true;
-                     }
-                  }
-
-                  return true;
-               } else {
-                  // unable to parse header
-                  Logger::error("unable to parse header");
-               }
-            } else {
-               // unable to read header
-               Logger::error("unable to read header");
-            }
-         } else {
-            // header length is empty
-            Logger::error("header length is empty");
-         }
-      } else {
-         // socket read failed
-         Logger::error("socket read failed");
-      }
-   } else {
+   if (socket == nullptr) {
       // no socket given
       Logger::error("no socket given to reconstitute");
+      return false;
    }
 
+   // Everything is read and validated into locals first; the message is
+   // modified only once the complete message has been received.
+   KeyValuePairs headers;
+   KeyValuePairs kvpPayload;
+   std::string textPayload;
+   MessageType messageType = MessageTypeUnknown;
+   bool isOneWay = false;
+   std::string problem;
+
+   do {
+      // header-length prefix: exactly 10 characters, a decimal number padded
+      // on the right with spaces
+      std::string prefix;
+      if (!readExact(socket, NUM_CHARS_HEADER_LENGTH, prefix)) {
+         problem = "header-length prefix incomplete";
+         break;
+      }
+
+      StrUtils::stripTrailing(prefix, ' ');
+
+      std::size_t headerLength = 0;
+      if (!parseWireLength(prefix, headerLength)) {
+         problem = "header-length prefix is not a valid decimal length";
+         break;
+      }
+
+      if (headerLength == 0) {
+         problem = "header length is empty";
+         break;
+      }
+
+      if (headerLength > MAX_HEADER_LENGTH) {
+         problem = "header length " + StrUtils::size_tToString(headerLength) +
+                   " exceeds the maximum of " + StrUtils::size_tToString(MAX_HEADER_LENGTH);
+         break;
+      }
+
+      std::string headerAsString;
+      if (!readExact(socket, headerLength, headerAsString)) {
+         problem = "header incomplete";
+         break;
+      }
+
+      if (!parseHeaders(headerAsString, headers, problem)) {
+         break;
+      }
+
+      // payload type: required, and must be one that is supported
+      if (!headers.hasKey(KEY_PAYLOAD_TYPE)) {
+         problem = "header has no payload_type";
+         break;
+      }
+
+      const std::string& valuePayloadType = headers.getValue(KEY_PAYLOAD_TYPE);
+      if (valuePayloadType == VALUE_PAYLOAD_TEXT) {
+         messageType = MessageTypeText;
+      } else if (valuePayloadType == VALUE_PAYLOAD_KVP) {
+         messageType = MessageTypeKeyValues;
+      } else {
+         problem = "unrecognized payload type";
+         break;
+      }
+
+      // payload length: required, valid, and within the limit *before* any
+      // payload bytes are read, so an oversized payload is never consumed (or
+      // dropped) and never left behind to be mistaken for the next message
+      if (!headers.hasKey(KEY_PAYLOAD_LENGTH)) {
+         problem = "header has no payload_length";
+         break;
+      }
+
+      std::size_t payloadLength = 0;
+      if (!parseWireLength(headers.getValue(KEY_PAYLOAD_LENGTH), payloadLength)) {
+         problem = "payload_length is not a valid decimal length";
+         break;
+      }
+
+      if (payloadLength > MAX_PAYLOAD_LENGTH) {
+         problem = "payload length " + StrUtils::size_tToString(payloadLength) +
+                   " exceeds the maximum of " + StrUtils::size_tToString(MAX_PAYLOAD_LENGTH);
+         break;
+      }
+
+      std::string payloadAsString;
+      if (!readExact(socket, payloadLength, payloadAsString)) {
+         problem = "payload incomplete";
+         break;
+      }
+
+      if (messageType == MessageTypeText) {
+         textPayload = payloadAsString;
+      } else {
+         // the key/values payload encoding is lossy and tolerant of pairs it
+         // cannot parse (see T0 defect D-5); it is not validated here
+         fromString(payloadAsString, kvpPayload);
+      }
+
+      if (headers.hasKey(KEY_ONE_WAY) &&
+          (headers.getValue(KEY_ONE_WAY) == VALUE_TRUE)) {
+         // mark it as being a 1-way message
+         isOneWay = true;
+      }
+
+      // complete and valid: replace this message's state
+      m_kvpHeaders = headers;
+      m_kvpPayload = kvpPayload;
+      m_textPayload = textPayload;
+      m_messageType = messageType;
+      m_isOneWay = isOneWay;
+      return true;
+
+   } while (false);
+
+   // The bytes that follow the point of failure cannot be trusted to start a
+   // message, so the connection is closed rather than left readable, and the
+   // message is left empty rather than partly populated.
+   Logger::error("unable to reconstitute message: " + problem);
+   clearReceivedState();
+   socket->close();
    return false;
 }
 
 //******************************************************************************
 
 std::string Message::toString() const {
+   std::string messageAsString;
+   toWireString(messageAsString);
+   return messageAsString;
+}
+
+//******************************************************************************
+
+bool Message::toWireString(std::string& messageAsString) const {
    KeyValuePairs kvpHeaders(m_kvpHeaders);
    std::string payload;
 
@@ -451,12 +620,14 @@ std::string Message::toString() const {
    std::string headerLengthPrefix = encodeLength(headersAsString.length());
    StrUtils::padRight(headerLengthPrefix, ' ', NUM_CHARS_HEADER_LENGTH);
 
-   std::string messageAsString;
+   messageAsString.clear();
    messageAsString += headerLengthPrefix;
    messageAsString += headersAsString;
    messageAsString += payload;
 
-   return messageAsString;
+   // a receiver rejects anything larger, so the sender must not send it
+   return (headersAsString.length() <= MAX_HEADER_LENGTH) &&
+          (payloadLength <= MAX_PAYLOAD_LENGTH);
 }
 
 //******************************************************************************
@@ -528,9 +699,10 @@ std::size_t Message::decodeLength(Socket* socket) {
       char lengthAsChars[11];
       memset(lengthAsChars, 0, NUM_CHARS_HEADER_LENGTH+1);
       if (socket->read(lengthAsChars, NUM_CHARS_HEADER_LENGTH)) {
-         std::string lengthPrefix = lengthAsChars;
+         std::string lengthPrefix(lengthAsChars, NUM_CHARS_HEADER_LENGTH);
          StrUtils::stripTrailing(lengthPrefix, ' ');
-         return StrUtils::parseLong(lengthPrefix);
+         // malformed text decodes as 0 rather than throwing
+         parseWireLength(lengthPrefix, lengthBytes);
       }
    }
 

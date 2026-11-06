@@ -7,11 +7,15 @@
 #include <cstdlib>
 #include <cstring>
 #include <fstream>
+#include <memory>
 #include <string>
 #include <thread>
 #include <utility>
 #include <vector>
 
+#include <arpa/inet.h>
+#include <netinet/in.h>
+#include <poll.h>
 #include <sys/socket.h>
 #include <unistd.h>
 
@@ -19,8 +23,12 @@
 #include "IsolatedCase.h"
 #include "LoopbackPair.h"
 #include "Message.h"
+#include "MessageHandler.h"
+#include "MessageRequestHandler.h"
+#include "Messaging.h"
 #include "KeyValuePairs.h"
 #include "BasicException.h"
+#include "ServiceInfo.h"
 #include "Socket.h"
 
 using namespace tonnerre;
@@ -46,9 +54,18 @@ enum class Expect {
    // reconstitute() must return true and deliver exactly the expected message
    Accept,
    // either reject, or accept *exactly* the expected message. Never "true with
-   // a payload that was silently altered or discarded". Used where the
-   // supported maximum is a policy decision that T1b has to make.
+   // a payload that was silently altered or discarded".
    RejectOrAcceptExactly
+};
+
+// what the scenario exercises
+enum class Kind {
+   Receive,                    // Message::reconstitute() against a scripted peer
+   SendOversizeOneWay,         // Message::send(service) with an oversized message
+   SendOversizeWithResponse,   // Message::send(service, response), oversized
+   SendBadResponseNotPooled,   // a failed response must not leave a pooled socket
+   SendGoodResponsePooled,     // control: a good response still pools the socket
+   ServerResponse              // MessageRequestHandler writing a response of a given size
 };
 
 struct ReceiveScenario {
@@ -63,32 +80,28 @@ struct ReceiveScenario {
    std::vector<std::pair<std::string, std::string>> expectedPairs;
    int timeoutMillis = 8000;
    std::string defect;                   // known defect this scenario exposes ("" if none)
+   Kind kind = Kind::Receive;
+   MessageType initialType = MessageTypeUnknown;  // state of the Message before reconstitute()
+   std::string initialText;
+   std::size_t payloadSize = 0;          // send/serve kinds: payload bytes to produce
 };
 
 }
 
 //******************************************************************************
-// Known defects (T0 report, section 9; D-15 is new in T1a). A scenario listed
-// here fails today and is reported as a known-defect scenario: it is expected
-// to fail until the defect is fixed, and it still counts as a failure in the
-// run. The list is the exact set of scenarios observed failing in T1a, tagged
-// with the defect that explains the failure; it is never used to skip a
-// scenario or to relax an expectation. T1b removes an entry when it fixes the
-// defect behind it.
+// Known defects (T0 report, section 9). A scenario listed here fails today and
+// is reported as a known-defect scenario: it is expected to fail until the
+// defect is fixed, and it still counts as a failure in the run. The list is
+// never used to skip a scenario or to relax an expectation.
 //
-//   D-1   negative or wrapped length reaches `stackBuffer[numberBytes]`
-//         (Message.cpp:290): out-of-bounds stack write. A crash or a sanitizer
-//         report; in an unsanitized build the write is silent.
-//   D-2   a failed or short readSocket() is treated as success, so truncated
-//         messages are accepted and an early disconnect throws
-//         (Message.cpp:289, 302, 328)
-//   D-3   payloads over 32,767 bytes are dropped silently while
-//         reconstitute() still returns true (Message.cpp:299-316, 374)
-//   D-4   size_t lengths narrowed to int (Message.cpp:334-339, 367-372): a
-//         length of 2^32+n is read as n
+// T1a listed 103 scenarios (defects D-1, D-2, D-3, D-4, D-8 and D-15). T1b fixed
+// the receive path (Message.cpp reconstitute()) and removed the 100 entries for
+// D-1, D-2, D-3, D-4 and D-15 after verifying that each passes, in Debug and in
+// ASan+UBSan builds, and across repeated runs. What remains:
+//
 //   D-8   no receive timeout: a stalled peer blocks the receiver forever
-//   D-15  non-numeric, empty or out-of-range numeric header text makes
-//         StrUtils::parseLong throw out of reconstitute() (Message.cpp:334, 367)
+//         (T1c). The scenarios can only assert that the receiver gives up; the
+//         timeout policy does not exist yet.
 //******************************************************************************
 
 namespace {
@@ -99,109 +112,9 @@ struct DefectNote {
 };
 
 const DefectNote KNOWN_DEFECTS[] = {
-   { "header-length.decimal-point", "D-15" },
-   { "header-length.digits-then-letters", "D-15" },
-   { "header-length.embedded-nuls", "D-15" },
-   { "header-length.empty-all-spaces", "D-15" },
-   { "header-length.exponent", "D-15" },
-   { "header-length.hex", "D-15" },
-   { "header-length.int-max-plus-1", "D-1" },
-   { "header-length.int-max-plus-2", "D-1" },
-   { "header-length.int-min", "D-1" },
-   { "header-length.leading-space", "D-15" },
-   { "header-length.negative-1", "D-1" },
-   { "header-length.negative-10-digits", "D-1" },
-   { "header-length.negative-5", "D-1" },
-   { "header-length.nonnumeric", "D-15" },
-   { "header-length.plus-sign", "D-15" },
-   { "header-length.uint-max", "D-1" },
-   { "header-length.with-trailing-data.-1", "D-1" },
-   { "header-length.with-trailing-data.2147483648", "D-1" },
-   { "header-length.with-trailing-data.4294967295", "D-1" },
-   { "header-length.wraps-to-100-with-valid-100-byte-header", "D-4" },
-   { "header-length.wraps-to-50-with-valid-50-byte-header", "D-4" },
-   { "payload-length.decimal", "D-15" },
-   { "payload-length.exponent", "D-15" },
-   { "payload-length.int-max", "D-3" },
-   { "payload-length.int-max-plus-1", "D-1" },
-   { "payload-length.leading-space", "D-15" },
-   { "payload-length.negative-1", "D-1" },
-   { "payload-length.nineteen-nines", "D-15" },
-   { "payload-length.nonnumeric", "D-15" },
-   { "payload-length.twenty-nines", "D-15" },
-   { "payload-length.uint-max", "D-1" },
-   { "payload-length.wraps-to-5-with-5-byte-payload", "D-4" },
-   { "payload-size.declared-forty-thousand-sent-10", "D-3" },
-   { "payload-size.declared-int-max-sent-10", "D-3" },
-   { "payload-size.declared-one-hundred-million-sent-10", "D-3" },
-   { "payload-size.kvp-3000-pairs", "D-3" },
-   { "payload-size.text-100000", "D-3" },
-   { "payload-size.text-32768", "D-3" },
-   { "payload-size.text-40000", "D-3" },
-   { "reset.end-of-header", "D-2" },
-   { "reset.inside-payload", "D-2" },
-   { "reset.no-bytes", "D-2" },
    { "stalled.silent-after-connect", "D-8" },
    { "stalled.silent-before-payload", "D-8" },
    { "stalled.silent-inside-prefix", "D-8" },
-   { "truncate.kvp.header@43of70", "D-2" },
-   { "truncate.kvp.header@44of70", "D-2" },
-   { "truncate.kvp.header@45of70", "D-2" },
-   { "truncate.kvp.header@46of70", "D-2" },
-   { "truncate.kvp.header@47of70", "D-2" },
-   { "truncate.kvp.header@48of70", "D-2" },
-   { "truncate.kvp.header@49of70", "D-2" },
-   { "truncate.kvp.header@50of70", "D-2" },
-   { "truncate.kvp.header@51of70", "D-2" },
-   { "truncate.kvp.header@52of70", "D-2" },
-   { "truncate.kvp.header@53of70", "D-2" },
-   { "truncate.kvp.header@54of70", "D-2" },
-   { "truncate.kvp.header@55of70", "D-2" },
-   { "truncate.kvp.header@56of70", "D-2" },
-   { "truncate.kvp.header@57of70", "D-2" },
-   { "truncate.kvp.header@58of70", "D-2" },
-   { "truncate.kvp.header@59of70", "D-2" },
-   { "truncate.kvp.header@60of70", "D-2" },
-   { "truncate.kvp.payload@61of70", "D-2" },
-   { "truncate.kvp.payload@62of70", "D-2" },
-   { "truncate.kvp.payload@63of70", "D-2" },
-   { "truncate.kvp.payload@64of70", "D-2" },
-   { "truncate.kvp.payload@65of70", "D-2" },
-   { "truncate.kvp.payload@66of70", "D-2" },
-   { "truncate.kvp.payload@67of70", "D-2" },
-   { "truncate.kvp.payload@68of70", "D-2" },
-   { "truncate.kvp.payload@69of70", "D-2" },
-   { "truncate.kvp.prefix@0of70", "D-2" },
-   { "truncate.text.header@45of74", "D-2" },
-   { "truncate.text.header@46of74", "D-2" },
-   { "truncate.text.header@47of74", "D-2" },
-   { "truncate.text.header@48of74", "D-2" },
-   { "truncate.text.header@49of74", "D-2" },
-   { "truncate.text.header@50of74", "D-2" },
-   { "truncate.text.header@51of74", "D-2" },
-   { "truncate.text.header@52of74", "D-2" },
-   { "truncate.text.header@53of74", "D-2" },
-   { "truncate.text.header@54of74", "D-2" },
-   { "truncate.text.header@55of74", "D-2" },
-   { "truncate.text.header@56of74", "D-2" },
-   { "truncate.text.header@57of74", "D-2" },
-   { "truncate.text.header@58of74", "D-2" },
-   { "truncate.text.header@59of74", "D-2" },
-   { "truncate.text.header@60of74", "D-2" },
-   { "truncate.text.header@61of74", "D-2" },
-   { "truncate.text.header@62of74", "D-2" },
-   { "truncate.text.payload@63of74", "D-2" },
-   { "truncate.text.payload@64of74", "D-2" },
-   { "truncate.text.payload@65of74", "D-2" },
-   { "truncate.text.payload@66of74", "D-2" },
-   { "truncate.text.payload@67of74", "D-2" },
-   { "truncate.text.payload@68of74", "D-2" },
-   { "truncate.text.payload@69of74", "D-2" },
-   { "truncate.text.payload@70of74", "D-2" },
-   { "truncate.text.payload@71of74", "D-2" },
-   { "truncate.text.payload@72of74", "D-2" },
-   { "truncate.text.payload@73of74", "D-2" },
-   { "truncate.text.prefix@0of74", "D-2" },
 };
 
 std::string knownDefectFor(const std::string& id) {
@@ -347,6 +260,14 @@ const int EXIT_EXCEPTION_ESCAPED   = 21;
 const int EXIT_WRONGLY_REJECTED    = 22;
 const int EXIT_CONTENT_MISMATCH    = 23;
 const int EXIT_SETUP_FAILED        = 24;
+const int EXIT_STATE_NOT_CLEARED   = 25;   // a rejected message still holds received state
+const int EXIT_CONNECTION_OPEN     = 26;   // the connection was not closed after a rejection
+const int EXIT_STREAM_REUSABLE     = 27;   // a second reconstitute() on the same socket succeeded
+const int EXIT_OVERSIZE_SENT       = 30;   // an oversized message reached the wire
+const int EXIT_DEAD_SOCKET_POOLED  = 31;   // a closed connection was returned to the pool
+const int EXIT_POOL_BROKEN         = 32;   // a healthy connection was not pooled
+const int EXIT_SEND_WRONG_RESULT   = 33;   // send() returned the wrong result
+const int EXIT_RESPONSE_MISMATCH   = 34;   // the served response is not what the limits require
 
 bool pairsEqual(const chaudiere::KeyValuePairs& kvp,
                 const std::vector<std::pair<std::string, std::string>>& expected) {
@@ -361,8 +282,23 @@ bool pairsEqual(const chaudiere::KeyValuePairs& kvp,
    return true;
 }
 
+int runReceiveScenarioInChild(const ReceiveScenario& scenario);
+int runSendScenarioInChild(const ReceiveScenario& scenario);
+int runServeScenarioInChild(const ReceiveScenario& scenario);
+
 // Runs inside the forked child.
 int runScenarioInChild(const ReceiveScenario& scenario) {
+   switch (scenario.kind) {
+      case Kind::Receive:
+         return runReceiveScenarioInChild(scenario);
+      case Kind::ServerResponse:
+         return runServeScenarioInChild(scenario);
+      default:
+         return runSendScenarioInChild(scenario);
+   }
+}
+
+int runReceiveScenarioInChild(const ReceiveScenario& scenario) {
    LoopbackPair pair;
    if (!pair.create()) {
       printf("RESULT setup failed (loopback pair)\n");
@@ -374,10 +310,33 @@ int runScenarioInChild(const ReceiveScenario& scenario) {
    peer.start();
 
    Message message;
+   message.setType(scenario.initialType);
+   message.setTextPayload(scenario.initialText);
    bool accepted = false;
+   int afterRejection = EXIT_MET;
 
    try {
       accepted = message.reconstitute(&serverSocket);
+
+      if (!accepted) {
+         // after a rejection: nothing received is left in the message, the
+         // connection is closed, and whatever bytes remain unread cannot be
+         // read as another message
+         if ((message.getType() != MessageTypeUnknown) ||
+             !message.getTextPayload().empty() ||
+             (message.getKeyValuesPayload().size() != 0) ||
+             message.hasHeader("payload_type") ||
+             message.hasHeader("payload_length")) {
+            afterRejection = EXIT_STATE_NOT_CLEARED;
+         } else if (serverSocket.isConnected()) {
+            afterRejection = EXIT_CONNECTION_OPEN;
+         } else {
+            Message second;
+            if (second.reconstitute(&serverSocket)) {
+               afterRejection = EXIT_STREAM_REUSABLE;
+            }
+         }
+      }
    } catch (const chaudiere::BasicException& be) {
       printf("RESULT exception escaped reconstitute(): BasicException '%s'\n", be.whatString().c_str());
       fflush(stdout);
@@ -417,7 +376,7 @@ int runScenarioInChild(const ReceiveScenario& scenario) {
 
    switch (scenario.expect) {
       case Expect::Reject:
-         return accepted ? EXIT_WRONGLY_ACCEPTED : EXIT_MET;
+         return accepted ? EXIT_WRONGLY_ACCEPTED : afterRejection;
 
       case Expect::Accept:
          if (!accepted) {
@@ -427,12 +386,295 @@ int runScenarioInChild(const ReceiveScenario& scenario) {
 
       case Expect::RejectOrAcceptExactly:
          if (!accepted) {
-            return EXIT_MET;
+            return afterRejection;
          }
          return contentMatches ? EXIT_MET : EXIT_CONTENT_MISMATCH;
    }
 
    return EXIT_SETUP_FAILED;
+}
+
+//******************************************************************************
+// Send path and server path (T1b): size limits on outgoing messages and what
+// happens to the connection after a failed exchange
+//******************************************************************************
+
+// a listening socket on 127.0.0.1 with a kernel-chosen port
+class ListeningEndpoint {
+public:
+   ListeningEndpoint() : m_fd(-1), m_port(0) {
+      m_fd = ::socket(AF_INET, SOCK_STREAM, 0);
+      if (m_fd < 0) {
+         return;
+      }
+      LoopbackPair::allowAddressReuse(m_fd);
+
+      sockaddr_in addr;
+      std::memset(&addr, 0, sizeof(addr));
+      addr.sin_family = AF_INET;
+      addr.sin_addr.s_addr = htonl(INADDR_LOOPBACK);
+      addr.sin_port = 0;
+
+      socklen_t addrLen = sizeof(addr);
+      if ((::bind(m_fd, reinterpret_cast<sockaddr*>(&addr), sizeof(addr)) != 0) ||
+          (::listen(m_fd, 4) != 0) ||
+          (::getsockname(m_fd, reinterpret_cast<sockaddr*>(&addr), &addrLen) != 0)) {
+         ::close(m_fd);
+         m_fd = -1;
+         return;
+      }
+      m_port = ntohs(addr.sin_port);
+   }
+
+   ~ListeningEndpoint() {
+      if (m_fd >= 0) {
+         ::close(m_fd);
+      }
+   }
+
+   bool ok() const { return m_fd >= 0; }
+   int fd() const { return m_fd; }
+   unsigned short port() const { return m_port; }
+
+   // true if a connection is waiting to be accepted within the given time
+   bool connectionPending(int waitMillis) const {
+      pollfd p;
+      p.fd = m_fd;
+      p.events = POLLIN;
+      p.revents = 0;
+      return ::poll(&p, 1, waitMillis) > 0;
+   }
+
+private:
+   int m_fd;
+   unsigned short m_port;
+};
+
+// bytes that arrive on fd within waitMillis (or until the peer closes)
+std::size_t bytesArriving(int fd, int waitMillis) {
+   std::size_t total = 0;
+   char buffer[4096];
+
+   while (true) {
+      pollfd p;
+      p.fd = fd;
+      p.events = POLLIN;
+      p.revents = 0;
+      if (::poll(&p, 1, waitMillis) <= 0) {
+         break;
+      }
+      const ssize_t n = ::recv(fd, buffer, sizeof(buffer), 0);
+      if (n <= 0) {
+         break;
+      }
+      total += static_cast<std::size_t>(n);
+   }
+
+   return total;
+}
+
+// accepts one connection, reads the request, writes 'reply', and then either
+// holds the connection open or closes it
+class ServicePeer {
+public:
+   ServicePeer(const ListeningEndpoint& endpoint, const std::string& reply, bool hold) :
+      m_endpoint(endpoint), m_reply(reply), m_hold(hold), m_release(false) {
+   }
+
+   void start() {
+      m_thread = std::thread([this]() { run(); });
+   }
+
+   void releaseAndJoin() {
+      m_release = true;
+      if (m_thread.joinable()) {
+         m_thread.join();
+      }
+   }
+
+private:
+   void run() {
+      if (!m_endpoint.connectionPending(3000)) {
+         return;
+      }
+      const int fd = ::accept(m_endpoint.fd(), nullptr, nullptr);
+      if (fd < 0) {
+         return;
+      }
+
+      // read the request: everything that arrives until a pause
+      bytesArriving(fd, 300);
+
+      std::size_t sent = 0;
+      while (sent < m_reply.size()) {
+         const ssize_t rc = ::send(fd, m_reply.data() + sent, m_reply.size() - sent, MSG_NOSIGNAL);
+         if (rc <= 0) {
+            break;
+         }
+         sent += static_cast<std::size_t>(rc);
+      }
+
+      if (m_hold) {
+         while (!m_release) {
+            std::this_thread::sleep_for(std::chrono::milliseconds(5));
+         }
+      } else {
+         ::shutdown(fd, SHUT_WR);
+      }
+      ::close(fd);
+   }
+
+   const ListeningEndpoint& m_endpoint;
+   std::string m_reply;
+   bool m_hold;
+   std::atomic<bool> m_release;
+   std::thread m_thread;
+};
+
+int runSendScenarioInChild(const ReceiveScenario& scenario) {
+   ListeningEndpoint endpoint;
+   if (!endpoint.ok()) {
+      printf("RESULT setup failed (listening socket)\n");
+      return EXIT_SETUP_FAILED;
+   }
+
+   Messaging* messagingObject = new Messaging();
+   chaudiere::ServiceInfo info("t1bService", "127.0.0.1", endpoint.port());
+   info.setPersistentConnection(true);
+   messagingObject->registerService("t1bService", info);
+   Messaging::setMessaging(messagingObject);
+   std::shared_ptr<Messaging> messaging = Messaging::getMessaging();
+
+   Message request("t1bRequest", MessageTypeText);
+   request.setTextPayload(std::string(scenario.payloadSize, 'p'));
+   Message response;
+
+   if ((scenario.kind == Kind::SendOversizeOneWay) ||
+       (scenario.kind == Kind::SendOversizeWithResponse)) {
+      const bool sent = (scenario.kind == Kind::SendOversizeOneWay)
+                        ? request.send("t1bService")
+                        : request.send("t1bService", response);
+      printf("RESULT send=%s\n", sent ? "true" : "false");
+      if (sent) {
+         return EXIT_SEND_WRONG_RESULT;
+      }
+
+      // nothing may have reached the wire: no connection, or a connection
+      // that carried no bytes
+      if (endpoint.connectionPending(200)) {
+         const int fd = ::accept(endpoint.fd(), nullptr, nullptr);
+         const std::size_t arrived = (fd >= 0) ? bytesArriving(fd, 200) : 0;
+         if (fd >= 0) {
+            ::close(fd);
+         }
+         if (arrived > 0) {
+            printf("RESULT %zu bytes of an oversized message reached the wire\n", arrived);
+            return EXIT_OVERSIZE_SENT;
+         }
+      }
+      return EXIT_MET;
+   }
+
+   const bool good = (scenario.kind == Kind::SendGoodResponsePooled);
+   std::string reply;
+   if (good) {
+      reply = validTextWire("ok");
+   } else {
+      // a response that stops in the middle of its payload
+      const std::string whole = validTextWire("a response that never completes");
+      reply = whole.substr(0, whole.size() - 8);
+   }
+
+   ServicePeer peer(endpoint, reply, good);
+   peer.start();
+
+   const bool received = request.send("t1bService", response);
+   printf("RESULT send=%s\n", received ? "true" : "false");
+
+   int result = EXIT_MET;
+   if (received != good) {
+      result = EXIT_SEND_WRONG_RESULT;
+   } else {
+      // whatever the pool now hands out must be a usable connection when the
+      // exchange succeeded, and must not be the failed one when it did not
+      chaudiere::Socket* next = messaging->socketForService(info);
+      if (next == nullptr) {
+         result = EXIT_POOL_BROKEN;
+      } else if (!next->isConnected()) {
+         result = good ? EXIT_POOL_BROKEN : EXIT_DEAD_SOCKET_POOLED;
+      } else if (good) {
+         // pooled and reused: no second connection was opened
+         if (endpoint.connectionPending(150)) {
+            result = EXIT_POOL_BROKEN;
+         }
+      }
+      delete next;
+   }
+
+   peer.releaseAndJoin();
+   return result;
+}
+
+// answers every text request with a payload of a configured size
+class SizedResponseHandler : public tonnerre::MessageHandler {
+public:
+   explicit SizedResponseHandler(std::size_t size) : m_size(size) {
+   }
+
+   void handleTextMessage(const Message&,
+                          Message&,
+                          const std::string&,
+                          const std::string&,
+                          std::string& responsePayload) override {
+      responsePayload.assign(m_size, 'r');
+   }
+
+   void handleKeyValuesMessage(const Message&,
+                               Message&,
+                               const std::string&,
+                               const chaudiere::KeyValuePairs&,
+                               chaudiere::KeyValuePairs&) override {
+   }
+
+private:
+   std::size_t m_size;
+};
+
+int runServeScenarioInChild(const ReceiveScenario& scenario) {
+   LoopbackPair pair;
+   if (!pair.create()) {
+      printf("RESULT setup failed (loopback pair)\n");
+      return EXIT_SETUP_FAILED;
+   }
+
+   const int clientFd = pair.releasePeerFd();
+   // the request handler takes ownership of the socket and closes it when deleted
+   chaudiere::Socket* serverSocket = new chaudiere::Socket(pair.releaseServerFd());
+
+   const std::string requestWire = validTextWire("please respond", "sizedRequest");
+   if (::send(clientFd, requestWire.data(), requestWire.size(), MSG_NOSIGNAL) !=
+       static_cast<ssize_t>(requestWire.size())) {
+      ::close(clientFd);
+      return EXIT_SETUP_FAILED;
+   }
+
+   SizedResponseHandler handler(scenario.payloadSize);
+   MessageRequestHandler* requestHandler = new MessageRequestHandler(serverSocket, &handler);
+   requestHandler->run();
+   delete requestHandler;
+
+   // the response the server is allowed to send, if any
+   Message expected("sizedRequest", MessageTypeText);
+   expected.setTextPayload(std::string(scenario.payloadSize, 'r'));
+   const std::size_t expectedBytes =
+      (scenario.payloadSize <= 32767) ? expected.toString().size() : 0;
+
+   const std::size_t arrived = bytesArriving(clientFd, 1000);
+   ::close(clientFd);
+
+   printf("RESULT served payload=%zu bytes arrived=%zu expected=%zu\n",
+          scenario.payloadSize, arrived, expectedBytes);
+   return (arrived == expectedBytes) ? EXIT_MET : EXIT_RESPONSE_MISMATCH;
 }
 
 std::string safeFileName(const std::string& id) {
@@ -514,6 +756,30 @@ void TestReceivePath::runScenario(const ReceiveScenario& scenarioIn) {
          case EXIT_CONTENT_MISMATCH:
             problem = "reconstitute() returned true but the message differs from what was sent "
                       "(payload altered or silently discarded)";
+            break;
+         case EXIT_STATE_NOT_CLEARED:
+            problem = "reconstitute() returned false but left received state in the message";
+            break;
+         case EXIT_CONNECTION_OPEN:
+            problem = "reconstitute() returned false but left the connection open";
+            break;
+         case EXIT_STREAM_REUSABLE:
+            problem = "after a rejection, a second reconstitute() on the same socket read more data";
+            break;
+         case EXIT_OVERSIZE_SENT:
+            problem = "an oversized message was written to the connection";
+            break;
+         case EXIT_DEAD_SOCKET_POOLED:
+            problem = "a connection that failed mid-exchange was returned to the connection pool";
+            break;
+         case EXIT_POOL_BROKEN:
+            problem = "a healthy connection was not returned to the pool (or the pool misbehaved)";
+            break;
+         case EXIT_SEND_WRONG_RESULT:
+            problem = "send() returned the wrong result";
+            break;
+         case EXIT_RESPONSE_MISMATCH:
+            problem = "the server sent a different number of response bytes than the size limit allows";
             break;
          default:
             problem = "child exited with unexpected status " + std::to_string(result.exitCode);
@@ -631,6 +897,61 @@ void TestReceivePath::testWellFormedMessages() {
       s.delayMillis = 1;
       s.expect = Expect::Accept;
       s.expectedText = "fragmented delivery";
+      runScenario(s);
+   }
+
+   {
+      ReceiveScenario s;
+      s.id = "valid.text.empty-request-name";
+      s.description = "text message whose request name is empty (written as 'request=')";
+      s.segments = { validTextWire("hello", "") };
+      s.expect = Expect::Accept;
+      s.expectedText = "hello";
+      runScenario(s);
+   }
+
+   {
+      const std::string text("ab\0cd\0", 6);
+      ReceiveScenario s;
+      s.id = "valid.text.embedded-nul-payload";
+      s.description = "text payload containing NUL bytes is delivered whole (not cut at the first NUL)";
+      s.segments = { validTextWire(text) };
+      s.expect = Expect::Accept;
+      s.expectedText = text;
+      runScenario(s);
+   }
+
+   {
+      ReceiveScenario s;
+      s.id = "valid.text.one-way-header";
+      s.description = "text message with a 1way=true header";
+      s.segments = { frame("payload_type=text;payload_length=5;request=r;1way=true", "hello") };
+      s.expect = Expect::Accept;
+      s.expectedText = "hello";
+      runScenario(s);
+   }
+
+   {
+      const std::string wire = validTextWire("zero-padded prefix");
+      const std::string length = std::to_string(std::atol(wire.substr(0, 10).c_str()));
+      ReceiveScenario s;
+      s.id = "valid.text.zero-padded-prefix";
+      s.description = "valid message whose header-length prefix is padded with leading zeros";
+      s.segments = { std::string(10 - length.size(), '0') + length + wire.substr(10) };
+      s.expect = Expect::Accept;
+      s.expectedText = "zero-padded prefix";
+      runScenario(s);
+   }
+
+   {
+      const std::string wire = validTextWire("two in a row") + validTextWire("second");
+      ReceiveScenario s;
+      s.id = "valid.text.followed-by-another-message";
+      s.description = "two valid messages back to back: the first is delivered intact "
+                      "(and does not consume the second)";
+      s.segments = { wire };
+      s.expect = Expect::Accept;
+      s.expectedText = "two in a row";
       runScenario(s);
    }
 
@@ -804,6 +1125,22 @@ void TestReceivePath::testMalformedHeaders() {
       { "no-equals-signs",        "this is not a header" },
       { "only-separators",        ";;;;;;;;" },
       { "binary-garbage",         std::string("\x01\x02\xff\xfe\x80;\x00=\x00", 10) },
+      { "missing-payload-length", "payload_type=text;request=myRequest" },
+      { "empty-payload-length",   "payload_type=text;payload_length=;request=myRequest" },
+      { "empty-payload-type",     "payload_type=;payload_length=5;request=myRequest" },
+      { "unknown-type-literal",   "payload_type=unknown;payload_length=5;request=myRequest" },
+      { "duplicate-payload-length", "payload_type=text;payload_length=5;payload_length=5;request=myRequest" },
+      { "conflicting-payload-length", "payload_type=text;payload_length=5;payload_length=6;request=myRequest" },
+      { "duplicate-payload-type", "payload_type=text;payload_type=text;payload_length=5" },
+      { "two-equals-in-pair",     "payload_type=text;payload_length=5;request=a=b" },
+      { "empty-pair-middle",      "payload_type=text;;payload_length=5" },
+      { "empty-pair-trailing",    "payload_type=text;payload_length=5;" },
+      { "empty-pair-leading",     ";payload_type=text;payload_length=5" },
+      { "empty-key",              "payload_type=text;payload_length=5;=x" },
+      { "pair-without-equals",    "payload_type=text;payload_length=5;orphan" },
+      { "type-case-mismatch",     "payload_type=TEXT;payload_length=5" },
+      { "payload-length-with-sign", "payload_type=text;payload_length=+5" },
+      { "payload-length-trailing-space", "payload_type=text;payload_length=5 " },
    };
 
    for (const auto& header : headers) {
@@ -812,6 +1149,44 @@ void TestReceivePath::testMalformedHeaders() {
       s.description = "well-framed header that is not a valid message header";
       s.segments = { frame(header.second, "hello") };
       s.expect = Expect::Reject;
+      runScenario(s);
+   }
+
+   // a message that already holds a type and a payload must not be left
+   // looking received (or keep its type) when the new message is rejected
+   {
+      ReceiveScenario s;
+      s.id = "header.unknown-type-on-preset-message";
+      s.description = "message already typed text with a stale payload receives payload_type=bogus";
+      s.segments = { frame("payload_type=bogus;payload_length=5;request=myRequest", "hello") };
+      s.initialType = MessageTypeText;
+      s.initialText = "stale";
+      s.expect = Expect::Reject;
+      runScenario(s);
+   }
+
+   {
+      ReceiveScenario s;
+      s.id = "truncated.clears-preset-state";
+      s.description = "message already typed text with a stale payload receives a truncated message";
+      const std::string wire = validTextWire("hello world");
+      s.segments = { wire.substr(0, wire.size() - 3) };
+      s.initialType = MessageTypeText;
+      s.initialText = "stale";
+      s.expect = Expect::Reject;
+      runScenario(s);
+   }
+
+   // and a message that is received replaces what it held
+   {
+      ReceiveScenario s;
+      s.id = "valid.replaces-preset-payload";
+      s.description = "message holding a stale payload receives a valid message with an empty payload";
+      s.segments = { validTextWire("") };
+      s.initialType = MessageTypeText;
+      s.initialText = "stale";
+      s.expect = Expect::Accept;
+      s.expectedText = "";
       runScenario(s);
    }
 }
@@ -898,21 +1273,42 @@ void TestReceivePath::testPeerResetDuringMessage() {
 //******************************************************************************
 
 void TestReceivePath::testPayloadSizeBoundaries() {
-   TEST_CASE("receive path: payload sizes at and beyond the 32,767-byte limit are never silently discarded");
+   TEST_CASE("receive path: payloads above the 32,767-byte limit are rejected, never silently discarded");
 
-   // 32,767 is the largest payload the current code reads (valid.text.payload-32767
-   // in the well-formed tests). Above it the supported maximum is a policy
-   // decision for T1b: the only wrong answer is "accepted, but not what was sent".
+   // 32,767 is the maximum payload (valid.text.payload-32767 in the well-formed
+   // tests accepts it intact); anything larger is rejected, and the receiver
+   // never reports success for a message whose payload it did not deliver
    const std::size_t sizes[] = { 32768, 40000, 100000 };
    for (std::size_t size : sizes) {
       const std::string text = repeatedChar('q', size);
       ReceiveScenario s;
       s.id = "payload-size.text-" + std::to_string(size);
       s.description = "text message with a " + std::to_string(size) +
-                      "-byte payload: reject it, or deliver all of it";
+                      "-byte payload (over the maximum) must be rejected";
       s.segments = { validTextWire(text) };
-      s.expect = Expect::RejectOrAcceptExactly;
-      s.expectedText = text;
+      s.expect = Expect::Reject;
+      runScenario(s);
+   }
+
+   // the unread bytes of an oversized message must not be interpreted as a
+   // message: the oversized message is followed by a complete, valid one
+   {
+      ReceiveScenario s;
+      s.id = "payload-size.oversized-then-valid-message";
+      s.description = "a 40,000-byte message followed by a valid message: the first is rejected "
+                      "and the connection yields nothing further";
+      s.segments = { validTextWire(repeatedChar('q', 40000)) + validTextWire("second") };
+      s.expect = Expect::Reject;
+      runScenario(s);
+   }
+
+   {
+      ReceiveScenario s;
+      s.id = "payload-size.declared-oversize-then-valid-message";
+      s.description = "header declares payload_length=40000, then a complete valid message arrives "
+                      "(the 'payload' would swallow it): rejected, and nothing further is read";
+      s.segments = { frame(textHeader("40000"), "") + validTextWire("second") };
+      s.expect = Expect::Reject;
       runScenario(s);
    }
 
@@ -935,21 +1331,99 @@ void TestReceivePath::testPayloadSizeBoundaries() {
    // key/values payload above the limit
    {
       chaudiere::KeyValuePairs kvp;
-      std::vector<std::pair<std::string, std::string>> pairs;
       for (int i = 0; i < 3000; ++i) {
-         const std::string key = "key" + std::to_string(i);
-         const std::string value = "value" + std::to_string(i);
-         kvp.addPair(key, value);
-         pairs.push_back({key, value});
+         kvp.addPair("key" + std::to_string(i), "value" + std::to_string(i));
       }
       ReceiveScenario s;
       s.id = "payload-size.kvp-3000-pairs";
-      s.description = "key/values message with 3000 simple pairs (well over 32 KiB of payload): "
-                      "reject it, or deliver every pair";
+      s.description = "key/values message with 3000 simple pairs (well over the 32,767-byte maximum "
+                      "of payload) must be rejected";
       s.segments = { validKvpWire(kvp) };
-      s.expect = Expect::RejectOrAcceptExactly;
+      s.expect = Expect::Reject;
       s.expectedType = MessageTypeKeyValues;
-      s.expectedPairs = pairs;
+      runScenario(s);
+   }
+
+   // header size limit: 32,767 is accepted, 32,768 is not
+   {
+      std::string header = "payload_type=text;payload_length=0;request=";
+      header += std::string(32767 - header.size(), 'h');
+      ReceiveScenario s;
+      s.id = "header-size.at-limit-32767";
+      s.description = "valid message whose header is exactly 32,767 bytes";
+      s.segments = { frame(header, "") };
+      s.expect = Expect::Accept;
+      s.expectedText = "";
+      runScenario(s);
+   }
+
+   {
+      std::string header = "payload_type=text;payload_length=0;request=";
+      header += std::string(32768 - header.size(), 'h');
+      ReceiveScenario s;
+      s.id = "header-size.over-limit-32768";
+      s.description = "header of 32,768 bytes (over the maximum) must be rejected";
+      s.segments = { frame(header, "") };
+      s.expect = Expect::Reject;
+      runScenario(s);
+   }
+
+   // sending: an oversized message is not sent; the server does not send an
+   // oversized response
+   const std::size_t oversize = 32768;
+   {
+      ReceiveScenario s;
+      s.id = "send.oversized-one-way";
+      s.description = "Message::send(service) with a 32,768-byte payload fails and writes nothing";
+      s.kind = Kind::SendOversizeOneWay;
+      s.payloadSize = oversize;
+      runScenario(s);
+   }
+
+   {
+      ReceiveScenario s;
+      s.id = "send.oversized-with-response";
+      s.description = "Message::send(service, response) with a 32,768-byte payload fails and writes nothing";
+      s.kind = Kind::SendOversizeWithResponse;
+      s.payloadSize = oversize;
+      runScenario(s);
+   }
+
+   {
+      ReceiveScenario s;
+      s.id = "serve.response-over-limit";
+      s.description = "a handler returns a 32,768-byte response: the server sends nothing";
+      s.kind = Kind::ServerResponse;
+      s.payloadSize = oversize;
+      runScenario(s);
+   }
+
+   {
+      ReceiveScenario s;
+      s.id = "serve.response-at-limit";
+      s.description = "a handler returns a 32,767-byte response: the server sends all of it";
+      s.kind = Kind::ServerResponse;
+      s.payloadSize = 32767;
+      runScenario(s);
+   }
+
+   // connection state after a failed exchange
+   {
+      ReceiveScenario s;
+      s.id = "pool.failed-response-is-not-pooled";
+      s.description = "persistent service: the response stops mid-payload; the failed connection is "
+                      "not returned to the pool";
+      s.kind = Kind::SendBadResponseNotPooled;
+      s.payloadSize = 5;
+      runScenario(s);
+   }
+
+   {
+      ReceiveScenario s;
+      s.id = "pool.good-response-is-pooled";
+      s.description = "persistent service: a good response still returns the connection to the pool";
+      s.kind = Kind::SendGoodResponsePooled;
+      s.payloadSize = 5;
       runScenario(s);
    }
 }
