@@ -53,7 +53,7 @@ public:
 //******************************************************************************
 
 TestMessageRequestHandler::TestMessageRequestHandler() :
-   poivre::TestSuite("TestMessageRequestHandler") {
+   tonnerre_test::TonnerreTestSuite("TestMessageRequestHandler") {
 }
 
 //******************************************************************************

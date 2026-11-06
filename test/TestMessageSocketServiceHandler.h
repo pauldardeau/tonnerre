@@ -4,12 +4,12 @@
 #ifndef TONNERRE_TESTMESSAGESOCKETSERVICEHANDLER_H
 #define TONNERRE_TESTMESSAGESOCKETSERVICEHANDLER_H
 
-#include "TestSuite.h"
+#include "TonnerreTestSuite.h"
 
 
 namespace tonnerre {
 
-class TestMessageSocketServiceHandler : public poivre::TestSuite {
+class TestMessageSocketServiceHandler : public tonnerre_test::TonnerreTestSuite {
 
 protected:
    void runTests();

@@ -19,7 +19,7 @@ SERVER_EXE_OBJS = TestServer.o
 POIVRE_OBJS = TestCase.o \
 TestSuite.o
 
-UNIT_TESTS_EXE_OBJS = Tests.o TestMessaging.o TestMessagingServer.o TestMessage.o TestMessageRequestHandler.o TestMessageSocketServiceHandler.o $(POIVRE_OBJS)
+UNIT_TESTS_EXE_OBJS = Tests.o TestMessaging.o TestMessagingServer.o TestMessage.o TestMessageRequestHandler.o TestMessageSocketServiceHandler.o IsolatedCase.o TestReceivePath.o $(POIVRE_OBJS)
 
 all : $(CLIENT_EXE) $(SERVER_EXE) $(UNIT_TESTS_EXE)
 

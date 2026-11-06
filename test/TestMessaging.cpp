@@ -16,7 +16,7 @@ using namespace chaudiere;
 //******************************************************************************
 
 TestMessaging::TestMessaging() :
-   poivre::TestSuite("TestMessaging") {
+   tonnerre_test::TonnerreTestSuite("TestMessaging") {
 }
 
 //******************************************************************************

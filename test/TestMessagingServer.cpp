@@ -63,7 +63,7 @@ void writeServerConfig(const std::string& configPath, int port) {
 //******************************************************************************
 
 TestMessagingServer::TestMessagingServer() :
-   poivre::TestSuite("TestMessagingServer") {
+   tonnerre_test::TonnerreTestSuite("TestMessagingServer") {
 }
 
 //******************************************************************************

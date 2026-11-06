@@ -4,12 +4,12 @@
 #ifndef TONNERRE_TESTMESSAGING_H
 #define TONNERRE_TESTMESSAGING_H
 
-#include "TestSuite.h"
+#include "TonnerreTestSuite.h"
 
 
 namespace tonnerre {
 
-class TestMessaging : public poivre::TestSuite {
+class TestMessaging : public tonnerre_test::TonnerreTestSuite {
 
 protected:
    void runTests();

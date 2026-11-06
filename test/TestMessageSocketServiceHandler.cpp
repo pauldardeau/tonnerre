@@ -52,7 +52,7 @@ public:
 //******************************************************************************
 
 TestMessageSocketServiceHandler::TestMessageSocketServiceHandler() :
-   poivre::TestSuite("TestMessageSocketServiceHandler") {
+   tonnerre_test::TonnerreTestSuite("TestMessageSocketServiceHandler") {
 }
 
 //******************************************************************************
