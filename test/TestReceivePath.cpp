@@ -301,7 +301,7 @@ public:
       struct sigaction action;
       std::memset(&action, 0, sizeof(action));
       action.sa_handler = onStormSignal;
-      ::sigemptyset(&action.sa_mask);
+      sigemptyset(&action.sa_mask);
       action.sa_flags = 0;   // deliberately no SA_RESTART
       m_installed = (::sigaction(SIGUSR1, &action, &m_previous) == 0);
 
