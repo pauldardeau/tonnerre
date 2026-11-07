@@ -35,21 +35,11 @@ struct RunTotals {
 
 RunTotals g_totals;
 
-// the established suites ("unit" group); the isolated receive-path suite
-// decides for itself which of its scenarios belong to the selected group
-bool isIsolatedSuite(const std::string& name) {
-   return name == "TestReceivePath";
-}
-
 void runSuite(std::unique_ptr<poivre::TestSuite> suite) {
    const std::string name = suite->getName();
    const RunConfig& config = runConfig();
 
    if (!config.suiteFilter.empty() && (config.suiteFilter != name)) {
-      return;
-   }
-
-   if ((config.group == Group::KnownDefects) && !isIsolatedSuite(name)) {
       return;
    }
 
@@ -94,10 +84,11 @@ void run_tests() {
 }
 
 void printUsage(const char* program) {
-   printf("usage: %s [--group all|unit|known-defects] [--suite <SuiteName>]\n", program);
-   printf("  all            every suite and every isolated scenario (default)\n");
-   printf("  unit           established suites + isolated scenarios not annotated with a known defect\n");
-   printf("  known-defects  only isolated scenarios annotated with a known defect\n");
+   printf("usage: %s [--group all|unit] [--suite <SuiteName>]\n", program);
+   printf("  all    every suite and every isolated scenario (default)\n");
+   printf("  unit   the same as all (there are no known defects to set apart any more)\n");
+   printf("set TONNERRE_TEST_SLOW=1 to include the scenario that waits out the 10 s default deadline\n");
+   printf("set TONNERRE_TEST_VERBOSE=1 to show what passing receive-path scenarios observed\n");
 }
 
 }
@@ -113,8 +104,6 @@ int main(int argc, char* argv[]) {
             runConfig().group = Group::All;
          } else if (value == "unit") {
             runConfig().group = Group::Unit;
-         } else if (value == "known-defects") {
-            runConfig().group = Group::KnownDefects;
          } else {
             printUsage(argv[0]);
             return 64;
@@ -156,9 +145,7 @@ int main(int argc, char* argv[]) {
       reason = "a suite executed no assertions";
    }
 
-   const char* groupName = (runConfig().group == Group::Unit) ? "unit"
-                           : (runConfig().group == Group::KnownDefects) ? "known-defects"
-                           : "all";
+   const char* groupName = (runConfig().group == Group::Unit) ? "unit" : "all";
 
    printf("\n=============================================================\n");
    printf("Tonnerre test summary (group: %s%s%s)\n",
@@ -174,9 +161,7 @@ int main(int argc, char* argv[]) {
       printf("  isolated receive-path scenarios (subprocess, loopback):\n");
       printf("    run:                       %d\n", tally.run);
       printf("    passed:                    %d\n", tally.passed);
-      printf("    failed, known defect:      %d   (expected until the defect is fixed)\n", tally.knownDefectFailures);
-      printf("    failed, UNEXPECTED:        %d\n", tally.unexpectedFailures);
-      printf("    known-defect now passing:  %d\n", tally.knownDefectNowPassing);
+      printf("    failed:                    %d\n", tally.unexpectedFailures);
       printf("    crashes / timeouts:        %d / %d\n", tally.crashes, tally.timeouts);
       printf("    sanitizer findings:        %d\n", tally.sanitizerFindings);
       printf("    escaped exceptions:        %d\n", tally.escapedExceptions);

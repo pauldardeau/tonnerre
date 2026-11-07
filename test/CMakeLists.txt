@@ -29,30 +29,16 @@ endif()
 target_link_libraries(test_tonnerre PRIVATE tonnerre poivre)
 
 # test_tonnerre exits nonzero when any assertion fails, when an exception
-# escapes a suite, or when no tests ran at all. It is registered twice so a
-# known-defect failure is visible on its own and cannot hide, or be hidden by,
-# the established suites:
-#   tonnerre_unit           established suites + scenarios with no known defect
-#   tonnerre_known_defects  scenarios annotated with a known defect (these are
-#                           expected to fail until the defect is fixed)
-# `test_tonnerre` with no arguments runs both groups.
+# escapes a suite, or when no tests ran at all. Every test, the isolated
+# receive-path scenarios included, runs in this one CTest entry. (Until the
+# receive deadline existed, three scenarios were known to fail and ran in a
+# second entry, tonnerre_known_defects, so that they could not hide, or be hidden
+# by, the rest. They pass now and that entry is gone.)
 add_test(
    NAME tonnerre_unit
    COMMAND test_tonnerre --group unit
    WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
 )
-
-if(NOT WIN32)
-   add_test(
-      NAME tonnerre_known_defects
-      COMMAND test_tonnerre --group known-defects
-      WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
-   )
-   set_tests_properties(tonnerre_known_defects PROPERTIES
-      LABELS "known-defects"
-      TIMEOUT 600
-   )
-endif()
 
 set_tests_properties(tonnerre_unit PROPERTIES
    LABELS "unit"

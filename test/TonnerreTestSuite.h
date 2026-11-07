@@ -12,15 +12,15 @@ namespace tonnerre_test {
 
 /**
  * Which part of the test run to execute (set by the runner from --group).
- *   All           everything (the default)
- *   Unit          the established suites plus every isolated scenario that is
- *                 not annotated with a known defect
- *   KnownDefects  only the isolated scenarios annotated with a known defect
+ *   All    everything (the default)
+ *   Unit   the same as All. Before the receive deadline existed (T1c), three
+ *          scenarios were known to fail and were run separately, and Unit left
+ *          them out; there are no known defects any more. The name is accepted
+ *          so that existing invocations keep working.
  */
 enum class Group {
    All,
-   Unit,
-   KnownDefects
+   Unit
 };
 
 struct RunConfig {
@@ -41,9 +41,7 @@ inline RunConfig& runConfig() {
 struct ScenarioTally {
    int run = 0;
    int passed = 0;
-   int knownDefectFailures = 0;      // failed, and annotated with a known defect
-   int unexpectedFailures = 0;       // failed, and not annotated
-   int knownDefectNowPassing = 0;    // annotated with a defect, but passed
+   int unexpectedFailures = 0;       // failed
    int crashes = 0;                  // child killed by a signal
    int timeouts = 0;                 // child exceeded its hard timeout
    int sanitizerFindings = 0;        // sanitizer report found in the child log

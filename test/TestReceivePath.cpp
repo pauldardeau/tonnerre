@@ -3,6 +3,7 @@
 
 #include <atomic>
 #include <chrono>
+#include <climits>
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
@@ -16,6 +17,8 @@
 #include <arpa/inet.h>
 #include <netinet/in.h>
 #include <poll.h>
+#include <pthread.h>
+#include <signal.h>
 #include <sys/socket.h>
 #include <unistd.h>
 
@@ -65,7 +68,10 @@ enum class Kind {
    SendOversizeWithResponse,   // Message::send(service, response), oversized
    SendBadResponseNotPooled,   // a failed response must not leave a pooled socket
    SendGoodResponsePooled,     // control: a good response still pools the socket
-   ServerResponse              // MessageRequestHandler writing a response of a given size
+   ServerResponse,             // MessageRequestHandler writing a response of a given size
+   ResponseDeadline,           // send(service, response, deadline) against a slow handler
+   NegativeReconstituteDeadline,   // reconstitute(socket, negative) is rejected untouched
+   NegativeSendDeadline        // send(service, response, negative) is rejected, nothing sent
 };
 
 struct ReceiveScenario {
@@ -78,53 +84,38 @@ struct ReceiveScenario {
    MessageType expectedType = MessageTypeText;
    std::string expectedText;
    std::vector<std::pair<std::string, std::string>> expectedPairs;
-   int timeoutMillis = 8000;
-   std::string defect;                   // known defect this scenario exposes ("" if none)
+   int timeoutMillis = 8000;             // hard limit for the child process (the harness backstop)
    Kind kind = Kind::Receive;
    MessageType initialType = MessageTypeUnknown;  // state of the Message before reconstitute()
    std::string initialText;
    std::size_t payloadSize = 0;          // send/serve kinds: payload bytes to produce
+
+   // receive deadline (T1c). The scenarios use sub-second deadlines, passed
+   // explicitly, so that the 10 s production default is never shortened for the
+   // harness's sake.
+   int deadlineMillis = -1;              // Receive: reconstitute(socket, n); -1: reconstitute(socket), the default
+                                         // ResponseDeadline: the short response deadline
+   int longDeadlineMillis = 0;           // ResponseDeadline: the longer one that must succeed
+   int handlerDelayMillis = 0;           // ResponseDeadline: how long the server's handler takes
+   int initialDelayMillis = 0;           // the peer waits this long before its first byte
+   int settleMillis = 0;                 // the receiver waits this long before it starts reading
+   int signalIntervalMillis = 0;         // > 0: SIGUSR1 to the receiving thread this often (no SA_RESTART)
+   int minElapsedMillis = 0;             // Receive/ResponseDeadline: required elapsed time (0: not checked)
+   int maxElapsedMillis = 0;
+   bool slowOptIn = false;               // runs only if TONNERRE_TEST_SLOW is set (waits out the 10 s default)
 };
 
 }
 
 //******************************************************************************
-// Known defects (T0 report, section 9). A scenario listed here fails today and
-// is reported as a known-defect scenario: it is expected to fail until the
-// defect is fixed, and it still counts as a failure in the run. The list is
-// never used to skip a scenario or to relax an expectation.
-//
-// T1a listed 103 scenarios (defects D-1, D-2, D-3, D-4, D-8 and D-15). T1b fixed
-// the receive path (Message.cpp reconstitute()) and removed the 100 entries for
-// D-1, D-2, D-3, D-4 and D-15 after verifying that each passes, in Debug and in
-// ASan+UBSan builds, and across repeated runs. What remains:
-//
-//   D-8   no receive timeout: a stalled peer blocks the receiver forever
-//         (T1c). The scenarios can only assert that the receiver gives up; the
-//         timeout policy does not exist yet.
+// History: T1a recorded 103 scenarios as known defects (T0 defects D-1, D-2, D-3,
+// D-4, D-8 and D-15). T1b fixed the receive-path framing (100 of them) and T1c
+// the receive deadline (the 3 D-8 stalled-peer scenarios). There is no longer a
+// known-defect table: every scenario is an ordinary test, and a failure is a
+// failure.
 //******************************************************************************
 
 namespace {
-
-struct DefectNote {
-   const char* id;
-   const char* defect;
-};
-
-const DefectNote KNOWN_DEFECTS[] = {
-   { "stalled.silent-after-connect", "D-8" },
-   { "stalled.silent-before-payload", "D-8" },
-   { "stalled.silent-inside-prefix", "D-8" },
-};
-
-std::string knownDefectFor(const std::string& id) {
-   for (const DefectNote& note : KNOWN_DEFECTS) {
-      if (id == note.id) {
-         return note.defect;
-      }
-   }
-   return std::string();
-}
 
 //******************************************************************************
 // Wire-format helpers (mirror the documented format; not production code)
@@ -176,11 +167,13 @@ public:
    RawPeer(int fd,
            const std::vector<std::string>& segments,
            int delayMillis,
-           PeerFinish finish) :
+           PeerFinish finish,
+           int initialDelayMillis = 0) :
       m_fd(fd),
       m_segments(segments),
       m_delayMillis(delayMillis),
       m_finish(finish),
+      m_initialDelayMillis(initialDelayMillis),
       m_release(false) {
    }
 
@@ -214,6 +207,10 @@ private:
    }
 
    void run() {
+      if (m_initialDelayMillis > 0) {
+         std::this_thread::sleep_for(std::chrono::milliseconds(m_initialDelayMillis));
+      }
+
       bool first = true;
       for (const std::string& segment : m_segments) {
          if (!first && (m_delayMillis > 0)) {
@@ -246,6 +243,7 @@ private:
    std::vector<std::string> m_segments;
    int m_delayMillis;
    PeerFinish m_finish;
+   int m_initialDelayMillis;
    std::atomic<bool> m_release;
    std::thread m_thread;
 };
@@ -268,6 +266,90 @@ const int EXIT_DEAD_SOCKET_POOLED  = 31;   // a closed connection was returned t
 const int EXIT_POOL_BROKEN         = 32;   // a healthy connection was not pooled
 const int EXIT_SEND_WRONG_RESULT   = 33;   // send() returned the wrong result
 const int EXIT_RESPONSE_MISMATCH   = 34;   // the served response is not what the limits require
+const int EXIT_TOO_EARLY           = 35;   // gave up before the deadline could have passed
+const int EXIT_TOO_LATE            = 36;   // took much longer than the deadline
+const int EXIT_DEADLINE_OVERRIDE   = 37;   // a response deadline was not honoured
+const int EXIT_NEGATIVE_MISHANDLED = 38;   // a negative deadline was not rejected cleanly
+const int EXIT_NO_SIGNALS          = 39;   // the signal storm delivered no signal (the test would prove nothing)
+
+//******************************************************************************
+// Signals: SIGUSR1 delivered to the receiving thread every few milliseconds, with
+// a handler installed without SA_RESTART, so that a poll() that is waiting is
+// interrupted (EINTR) over and over
+
+volatile sig_atomic_t g_stormSignals = 0;
+
+void onStormSignal(int) {
+   g_stormSignals = g_stormSignals + 1;
+}
+
+class SignalStorm {
+public:
+   explicit SignalStorm(int intervalMillis) :
+      m_target(pthread_self()),
+      m_intervalMillis(intervalMillis),
+      m_stop(false),
+      m_installed(false) {
+      g_stormSignals = 0;
+
+      struct sigaction action;
+      std::memset(&action, 0, sizeof(action));
+      action.sa_handler = onStormSignal;
+      ::sigemptyset(&action.sa_mask);
+      action.sa_flags = 0;   // deliberately no SA_RESTART
+      m_installed = (::sigaction(SIGUSR1, &action, &m_previous) == 0);
+
+      if (m_installed) {
+         m_thread = std::thread([this]() { run(); });
+      }
+   }
+
+   ~SignalStorm() {
+      m_stop = true;
+      if (m_thread.joinable()) {
+         m_thread.join();
+      }
+      if (m_installed) {
+         ::sigaction(SIGUSR1, &m_previous, nullptr);
+      }
+   }
+
+   SignalStorm(const SignalStorm&) = delete;
+   SignalStorm& operator=(const SignalStorm&) = delete;
+
+   bool installed() const { return m_installed; }
+
+private:
+   void run() {
+      while (!m_stop) {
+         ::pthread_kill(m_target, SIGUSR1);
+         std::this_thread::sleep_for(std::chrono::milliseconds(m_intervalMillis));
+      }
+   }
+
+   pthread_t m_target;
+   int m_intervalMillis;
+   std::atomic<bool> m_stop;
+   bool m_installed;
+   struct sigaction m_previous;
+   std::thread m_thread;
+};
+
+long long millisSince(std::chrono::steady_clock::time_point since) {
+   return std::chrono::duration_cast<std::chrono::milliseconds>(
+      std::chrono::steady_clock::now() - since).count();
+}
+
+// elapsed time against the scenario's bounds; EXIT_MET if there are none or they hold
+int timingResult(const ReceiveScenario& scenario, long long elapsedMillis) {
+   if ((scenario.minElapsedMillis > 0) && (elapsedMillis < scenario.minElapsedMillis)) {
+      return EXIT_TOO_EARLY;
+   }
+   if ((scenario.maxElapsedMillis > 0) && (elapsedMillis > scenario.maxElapsedMillis)) {
+      return EXIT_TOO_LATE;
+   }
+   return EXIT_MET;
+}
 
 bool pairsEqual(const chaudiere::KeyValuePairs& kvp,
                 const std::vector<std::pair<std::string, std::string>>& expected) {
@@ -285,6 +367,9 @@ bool pairsEqual(const chaudiere::KeyValuePairs& kvp,
 int runReceiveScenarioInChild(const ReceiveScenario& scenario);
 int runSendScenarioInChild(const ReceiveScenario& scenario);
 int runServeScenarioInChild(const ReceiveScenario& scenario);
+int runResponseDeadlineScenarioInChild(const ReceiveScenario& scenario);
+int runNegativeReconstituteScenarioInChild(const ReceiveScenario& scenario);
+int runNegativeSendScenarioInChild(const ReceiveScenario& scenario);
 
 // Runs inside the forked child.
 int runScenarioInChild(const ReceiveScenario& scenario) {
@@ -293,6 +378,12 @@ int runScenarioInChild(const ReceiveScenario& scenario) {
          return runReceiveScenarioInChild(scenario);
       case Kind::ServerResponse:
          return runServeScenarioInChild(scenario);
+      case Kind::ResponseDeadline:
+         return runResponseDeadlineScenarioInChild(scenario);
+      case Kind::NegativeReconstituteDeadline:
+         return runNegativeReconstituteScenarioInChild(scenario);
+      case Kind::NegativeSendDeadline:
+         return runNegativeSendScenarioInChild(scenario);
       default:
          return runSendScenarioInChild(scenario);
    }
@@ -306,7 +397,11 @@ int runReceiveScenarioInChild(const ReceiveScenario& scenario) {
    }
 
    chaudiere::Socket serverSocket(pair.releaseServerFd());
-   RawPeer peer(pair.releasePeerFd(), scenario.segments, scenario.delayMillis, scenario.finish);
+   RawPeer peer(pair.releasePeerFd(),
+                scenario.segments,
+                scenario.delayMillis,
+                scenario.finish,
+                scenario.initialDelayMillis);
    peer.start();
 
    Message message;
@@ -314,9 +409,35 @@ int runReceiveScenarioInChild(const ReceiveScenario& scenario) {
    message.setTextPayload(scenario.initialText);
    bool accepted = false;
    int afterRejection = EXIT_MET;
+   long long elapsedMillis = 0;
+   int signalsDelivered = 0;
+
+   // lets bytes that are already on their way arrive before reading starts
+   if (scenario.settleMillis > 0) {
+      std::this_thread::sleep_for(std::chrono::milliseconds(scenario.settleMillis));
+   }
+
+   // declared after the peer, so it is stopped first
+   std::unique_ptr<SignalStorm> storm;
+   if (scenario.signalIntervalMillis > 0) {
+      storm.reset(new SignalStorm(scenario.signalIntervalMillis));
+      if (!storm->installed()) {
+         printf("RESULT setup failed (signal handler)\n");
+         return EXIT_SETUP_FAILED;
+      }
+   }
 
    try {
-      accepted = message.reconstitute(&serverSocket);
+      const std::chrono::steady_clock::time_point began = std::chrono::steady_clock::now();
+      accepted = (scenario.deadlineMillis >= 0)
+                 ? message.reconstitute(&serverSocket, scenario.deadlineMillis)
+                 : message.reconstitute(&serverSocket);
+      elapsedMillis = millisSince(began);
+
+      if (storm) {
+         storm.reset();
+         signalsDelivered = g_stormSignals;
+      }
 
       if (!accepted) {
          // after a rejection: nothing received is left in the message, the
@@ -367,31 +488,48 @@ int runReceiveScenarioInChild(const ReceiveScenario& scenario) {
          ? (message.getTextPayload() == scenario.expectedText)
          : pairsEqual(message.getKeyValuesPayload(), scenario.expectedPairs));
 
-   printf("RESULT reconstitute=%s type=%d textBytes=%zu pairs=%zu contentMatchesExpected=%s\n",
+   printf("RESULT reconstitute=%s type=%d textBytes=%zu pairs=%zu contentMatchesExpected=%s elapsedMs=%lld signals=%d\n",
           accepted ? "true" : "false",
           static_cast<int>(message.getType()),
           message.getTextPayload().size(),
           message.getKeyValuesPayload().size(),
-          contentMatches ? "yes" : "no");
+          contentMatches ? "yes" : "no",
+          elapsedMillis,
+          signalsDelivered);
 
+   int result = EXIT_SETUP_FAILED;
    switch (scenario.expect) {
       case Expect::Reject:
-         return accepted ? EXIT_WRONGLY_ACCEPTED : afterRejection;
+         result = accepted ? EXIT_WRONGLY_ACCEPTED : afterRejection;
+         break;
 
       case Expect::Accept:
          if (!accepted) {
-            return EXIT_WRONGLY_REJECTED;
+            result = EXIT_WRONGLY_REJECTED;
+         } else {
+            result = contentMatches ? EXIT_MET : EXIT_CONTENT_MISMATCH;
          }
-         return contentMatches ? EXIT_MET : EXIT_CONTENT_MISMATCH;
+         break;
 
       case Expect::RejectOrAcceptExactly:
          if (!accepted) {
-            return afterRejection;
+            result = afterRejection;
+         } else {
+            result = contentMatches ? EXIT_MET : EXIT_CONTENT_MISMATCH;
          }
-         return contentMatches ? EXIT_MET : EXIT_CONTENT_MISMATCH;
+         break;
    }
 
-   return EXIT_SETUP_FAILED;
+   if (result == EXIT_MET) {
+      result = timingResult(scenario, elapsedMillis);
+   }
+
+   // a signal test in which no signal arrived would prove nothing
+   if ((result == EXIT_MET) && (scenario.signalIntervalMillis > 0) && (signalsDelivered == 0)) {
+      result = EXIT_NO_SIGNALS;
+   }
+
+   return result;
 }
 
 //******************************************************************************
@@ -677,6 +815,231 @@ int runServeScenarioInChild(const ReceiveScenario& scenario) {
    return (arrived == expectedBytes) ? EXIT_MET : EXIT_RESPONSE_MISMATCH;
 }
 
+//******************************************************************************
+// Receive deadline for the response (T1c): send(service, response, deadline)
+//******************************************************************************
+
+// answers every text request, after a delay
+class SlowResponseHandler : public tonnerre::MessageHandler {
+public:
+   explicit SlowResponseHandler(int delayMillis) : m_delayMillis(delayMillis) {
+   }
+
+   void handleTextMessage(const Message&,
+                          Message&,
+                          const std::string&,
+                          const std::string&,
+                          std::string& responsePayload) override {
+      std::this_thread::sleep_for(std::chrono::milliseconds(m_delayMillis));
+      responsePayload = "slow reply";
+   }
+
+   void handleKeyValuesMessage(const Message&,
+                               Message&,
+                               const std::string&,
+                               const chaudiere::KeyValuePairs&,
+                               chaudiere::KeyValuePairs&) override {
+   }
+
+private:
+   int m_delayMillis;
+};
+
+// Serves the connections that arrive at an endpoint, one at a time, with a real
+// MessageRequestHandler, until it is stopped
+class RequestServer {
+public:
+   RequestServer(const ListeningEndpoint& endpoint, tonnerre::MessageHandler* handler) :
+      m_endpoint(endpoint), m_handler(handler), m_stop(false) {
+   }
+
+   void start() {
+      m_thread = std::thread([this]() { run(); });
+   }
+
+   void stopAndJoin() {
+      m_stop = true;
+      if (m_thread.joinable()) {
+         m_thread.join();
+      }
+   }
+
+private:
+   void run() {
+      while (!m_stop) {
+         if (!m_endpoint.connectionPending(50)) {
+            continue;
+         }
+         const int fd = ::accept(m_endpoint.fd(), nullptr, nullptr);
+         if (fd < 0) {
+            continue;
+         }
+         // the request handler owns the socket and closes it when deleted
+         MessageRequestHandler* requestHandler =
+            new MessageRequestHandler(new chaudiere::Socket(fd), m_handler);
+         requestHandler->run();
+         delete requestHandler;
+      }
+   }
+
+   const ListeningEndpoint& m_endpoint;
+   tonnerre::MessageHandler* m_handler;
+   std::atomic<bool> m_stop;
+   std::thread m_thread;
+};
+
+int runResponseDeadlineScenarioInChild(const ReceiveScenario& scenario) {
+   // the server's late answer to a connection that the client has already given
+   // up on must not be able to kill this process (SIGPIPE is a separate defect)
+   ::signal(SIGPIPE, SIG_IGN);
+
+   ListeningEndpoint endpoint;
+   if (!endpoint.ok()) {
+      printf("RESULT setup failed (listening socket)\n");
+      return EXIT_SETUP_FAILED;
+   }
+
+   Messaging* messagingObject = new Messaging();
+   chaudiere::ServiceInfo info("t1bService", "127.0.0.1", endpoint.port());
+   info.setPersistentConnection(true);
+   messagingObject->registerService("t1bService", info);
+   Messaging::setMessaging(messagingObject);
+   std::shared_ptr<Messaging> messaging = Messaging::getMessaging();
+
+   SlowResponseHandler handler(scenario.handlerDelayMillis);
+   RequestServer server(endpoint, &handler);
+   server.start();
+
+   // 1. a short deadline: the handler is still working when it passes
+   {
+      Message request("slowRequest", MessageTypeText);
+      request.setTextPayload("please wait");
+      Message response;
+
+      const std::chrono::steady_clock::time_point began = std::chrono::steady_clock::now();
+      const bool received = request.send("t1bService", response, scenario.deadlineMillis);
+      const long long elapsed = millisSince(began);
+      printf("RESULT short deadline %d ms: send=%s after %lld ms (handler needs %d ms)\n",
+             scenario.deadlineMillis, received ? "true" : "false", elapsed, scenario.handlerDelayMillis);
+
+      int result = EXIT_MET;
+      if (received) {
+         result = EXIT_DEADLINE_OVERRIDE;
+      } else if ((response.getType() != MessageTypeUnknown) || !response.getTextPayload().empty()) {
+         result = EXIT_STATE_NOT_CLEARED;
+      } else {
+         result = timingResult(scenario, elapsed);
+      }
+
+      if (result == EXIT_MET) {
+         // the failed connection must not have gone back to the pool
+         chaudiere::Socket* next = messaging->socketForService(info);
+         const bool deadSocket = (next == nullptr) || !next->isConnected();
+         delete next;
+         if (deadSocket) {
+            result = EXIT_DEAD_SOCKET_POOLED;
+         }
+      }
+
+      if (result != EXIT_MET) {
+         server.stopAndJoin();
+         return result;
+      }
+   }
+
+   // 2. the longer deadline lets the same operation succeed
+   {
+      Message request("slowRequest", MessageTypeText);
+      request.setTextPayload("please wait");
+      Message response;
+
+      const std::chrono::steady_clock::time_point began = std::chrono::steady_clock::now();
+      const bool received = request.send("t1bService", response, scenario.longDeadlineMillis);
+      const long long elapsed = millisSince(began);
+      printf("RESULT long deadline %d ms: send=%s after %lld ms\n",
+             scenario.longDeadlineMillis, received ? "true" : "false", elapsed);
+      server.stopAndJoin();
+
+      if (!received) {
+         return EXIT_DEADLINE_OVERRIDE;
+      }
+      if ((response.getType() != MessageTypeText) || (response.getTextPayload() != "slow reply")) {
+         return EXIT_CONTENT_MISMATCH;
+      }
+      if (elapsed >= scenario.longDeadlineMillis) {
+         return EXIT_TOO_LATE;
+      }
+   }
+
+   return EXIT_MET;
+}
+
+// reconstitute(socket, negative) is a caller's mistake: it is rejected before
+// anything is read, and neither the message nor the connection is touched
+int runNegativeReconstituteScenarioInChild(const ReceiveScenario& scenario) {
+   LoopbackPair pair;
+   if (!pair.create()) {
+      printf("RESULT setup failed (loopback pair)\n");
+      return EXIT_SETUP_FAILED;
+   }
+
+   chaudiere::Socket serverSocket(pair.releaseServerFd());
+   RawPeer peer(pair.releasePeerFd(), scenario.segments, 0, PeerFinish::Hold);
+   peer.start();
+
+   Message message;
+   message.setType(MessageTypeText);
+   message.setTextPayload("keep me");
+
+   const bool minusOne = message.reconstitute(&serverSocket, -1);
+   const bool intMin = message.reconstitute(&serverSocket, INT_MIN);
+   const bool untouched = (message.getType() == MessageTypeText) &&
+                          (message.getTextPayload() == "keep me") &&
+                          serverSocket.isConnected();
+
+   // nothing was consumed: the message that is waiting can still be read
+   const bool later = message.reconstitute(&serverSocket, 5000);
+   const bool content = later && (message.getTextPayload() == scenario.expectedText);
+
+   serverSocket.close();
+   peer.releaseAndJoin();
+
+   printf("RESULT -1 accepted=%s INT_MIN accepted=%s untouched=%s laterRead=%s\n",
+          minusOne ? "true" : "false", intMin ? "true" : "false",
+          untouched ? "yes" : "no", content ? "yes" : "no");
+
+   return (!minusOne && !intMin && untouched && content) ? EXIT_MET : EXIT_NEGATIVE_MISHANDLED;
+}
+
+// send(service, response, negative) is rejected before anything is sent or
+// connected
+int runNegativeSendScenarioInChild(const ReceiveScenario&) {
+   ListeningEndpoint endpoint;
+   if (!endpoint.ok()) {
+      printf("RESULT setup failed (listening socket)\n");
+      return EXIT_SETUP_FAILED;
+   }
+
+   Messaging* messagingObject = new Messaging();
+   chaudiere::ServiceInfo info("t1bService", "127.0.0.1", endpoint.port());
+   info.setPersistentConnection(true);
+   messagingObject->registerService("t1bService", info);
+   Messaging::setMessaging(messagingObject);
+
+   Message request("negativeRequest", MessageTypeText);
+   request.setTextPayload("never sent");
+   Message response;
+
+   const bool minusOne = request.send("t1bService", response, -1);
+   const bool intMin = request.send("t1bService", response, INT_MIN);
+   const bool connected = endpoint.connectionPending(200);
+
+   printf("RESULT -1 send=%s INT_MIN send=%s connectionMade=%s\n",
+          minusOne ? "true" : "false", intMin ? "true" : "false", connected ? "yes" : "no");
+
+   return (!minusOne && !intMin && !connected) ? EXIT_MET : EXIT_NEGATIVE_MISHANDLED;
+}
+
 std::string safeFileName(const std::string& id) {
    std::string name;
    for (char c : id) {
@@ -708,14 +1071,14 @@ TestReceivePath::TestReceivePath() :
 //******************************************************************************
 
 void TestReceivePath::runScenario(const ReceiveScenario& scenarioIn) {
-   ReceiveScenario scenario = scenarioIn;
-   scenario.defect = knownDefectFor(scenario.id);
+   const ReceiveScenario& scenario = scenarioIn;
 
-   const Group group = runConfig().group;
-   const bool isKnownDefect = !scenario.defect.empty();
-   if (((group == Group::Unit) && isKnownDefect) ||
-       ((group == Group::KnownDefects) && !isKnownDefect)) {
-      return;
+   // scenarios that wait out the 10 s production default run only on request
+   if (scenario.slowOptIn) {
+      const char* slow = std::getenv("TONNERRE_TEST_SLOW");
+      if ((slow == nullptr) || (*slow == '\0')) {
+         return;
+      }
    }
 
    ScenarioTally& tally = scenarioTally();
@@ -781,6 +1144,21 @@ void TestReceivePath::runScenario(const ReceiveScenario& scenarioIn) {
          case EXIT_RESPONSE_MISMATCH:
             problem = "the server sent a different number of response bytes than the size limit allows";
             break;
+         case EXIT_TOO_EARLY:
+            problem = "the call gave up before its deadline could have passed";
+            break;
+         case EXIT_TOO_LATE:
+            problem = "the call took far longer than its deadline allows";
+            break;
+         case EXIT_DEADLINE_OVERRIDE:
+            problem = "a response deadline was not honoured (a short one did not fail, or a long one did not allow the response)";
+            break;
+         case EXIT_NEGATIVE_MISHANDLED:
+            problem = "a negative deadline was accepted, or it changed the message, the connection or the stream";
+            break;
+         case EXIT_NO_SIGNALS:
+            problem = "the signal storm delivered no signal, so the scenario proved nothing";
+            break;
          default:
             problem = "child exited with unexpected status " + std::to_string(result.exitCode);
             break;
@@ -792,21 +1170,17 @@ void TestReceivePath::runScenario(const ReceiveScenario& scenarioIn) {
 
    if (passed) {
       ++tally.passed;
-      if (isKnownDefect) {
-         ++tally.knownDefectNowPassing;
-         printf("[XPASS %s] %s  -- annotated as a known defect but passes in this build (the defect may be observable only under a sanitizer, or it has been fixed)\n",
-                scenario.defect.c_str(), scenario.id.c_str());
-      } else {
-         printf("[PASS] %s\n", scenario.id.c_str());
+      printf("[PASS] %s\n", scenario.id.c_str());
+
+      // TONNERRE_TEST_VERBOSE=1 also shows what a passing scenario observed
+      // (for the deadline scenarios: how long the call took)
+      const char* verbose = std::getenv("TONNERRE_TEST_VERBOSE");
+      if ((verbose != nullptr) && (*verbose != '\0') && !observed.empty()) {
+         printf("       observed: %s\n", observed.c_str());
       }
    } else {
-      if (isKnownDefect) {
-         ++tally.knownDefectFailures;
-         printf("[FAIL known-defect %s] %s\n", scenario.defect.c_str(), scenario.id.c_str());
-      } else {
-         ++tally.unexpectedFailures;
-         printf("[FAIL unexpected] %s\n", scenario.id.c_str());
-      }
+      ++tally.unexpectedFailures;
+      printf("[FAIL] %s\n", scenario.id.c_str());
       printf("       %s\n", scenario.description.c_str());
       printf("       %s\n", problem.c_str());
       if (!observed.empty()) {
@@ -842,6 +1216,9 @@ void TestReceivePath::runTests() {
    testPeerResetDuringMessage();
    testPayloadSizeBoundaries();
    testStalledPeer();
+   testReceiveDeadline();
+   testResponseDeadline();
+   testDeadlineArguments();
 }
 
 //******************************************************************************
@@ -1429,8 +1806,35 @@ void TestReceivePath::testPayloadSizeBoundaries() {
 }
 
 //******************************************************************************
-// D-8: a peer that connects, sends part of a message and then stays silent
+// D-8 (fixed in T1c): a peer that connects, sends part of a message and then
+// stays silent. The receiver gives up when its deadline passes. These scenarios
+// pass a deadline of 500 ms instead of the 10 s default so that they are quick;
+// the harness backstop is the deadline plus 5 s, and the elapsed time is checked
+// coarsely (at least 90% of the deadline, at most the deadline plus 1.5 s).
 //******************************************************************************
+
+namespace {
+
+const int SCENARIO_DEADLINE = 500;
+
+// a Receive scenario that must be rejected at about its deadline
+void expectRejectionAtDeadline(ReceiveScenario& s, int deadlineMillis) {
+   s.expect = Expect::Reject;
+   s.deadlineMillis = deadlineMillis;
+   s.minElapsedMillis = deadlineMillis * 9 / 10;
+   s.maxElapsedMillis = deadlineMillis + 1500;
+   s.timeoutMillis = deadlineMillis + 5000;
+}
+
+std::vector<std::string> oneByteSegments(const std::string& wire) {
+   std::vector<std::string> segments;
+   for (char c : wire) {
+      segments.push_back(std::string(1, c));
+   }
+   return segments;
+}
+
+}
 
 void TestReceivePath::testStalledPeer() {
    TEST_CASE("receive path: a stalled peer must not block the receiver indefinitely");
@@ -1443,8 +1847,7 @@ void TestReceivePath::testStalledPeer() {
       s.description = "peer connects, sends nothing and stays connected";
       s.segments = {};
       s.finish = PeerFinish::Hold;
-      s.expect = Expect::Reject;
-      s.timeoutMillis = 3000;
+      expectRejectionAtDeadline(s, SCENARIO_DEADLINE);
       runScenario(s);
    }
 
@@ -1454,8 +1857,7 @@ void TestReceivePath::testStalledPeer() {
       s.description = "peer sends 4 of the 10 prefix bytes and stays connected";
       s.segments = { wire.substr(0, 4) };
       s.finish = PeerFinish::Hold;
-      s.expect = Expect::Reject;
-      s.timeoutMillis = 3000;
+      expectRejectionAtDeadline(s, SCENARIO_DEADLINE);
       runScenario(s);
    }
 
@@ -1465,8 +1867,283 @@ void TestReceivePath::testStalledPeer() {
       s.description = "peer sends the prefix and header but no payload and stays connected";
       s.segments = { wire.substr(0, wire.size() - 11) };
       s.finish = PeerFinish::Hold;
+      expectRejectionAtDeadline(s, SCENARIO_DEADLINE);
+      runScenario(s);
+   }
+
+   {
+      ReceiveScenario s;
+      s.id = "stalled.silent-inside-header";
+      s.description = "peer sends the prefix and 5 header bytes and stays connected";
+      s.segments = { wire.substr(0, 15) };
+      s.finish = PeerFinish::Hold;
+      expectRejectionAtDeadline(s, SCENARIO_DEADLINE);
+      runScenario(s);
+   }
+
+   {
+      ReceiveScenario s;
+      s.id = "stalled.silent-inside-payload";
+      s.description = "peer sends everything but the last 4 payload bytes and stays connected";
+      s.segments = { wire.substr(0, wire.size() - 4) };
+      s.finish = PeerFinish::Hold;
+      expectRejectionAtDeadline(s, SCENARIO_DEADLINE);
+      runScenario(s);
+   }
+}
+
+//******************************************************************************
+// T1c: one deadline for the whole message
+//******************************************************************************
+
+void TestReceivePath::testReceiveDeadline() {
+   TEST_CASE("receive path: one deadline covers the whole message");
+
+   const std::string wire = validTextWire("hello world");
+   const std::string header = textHeader("11");
+   const std::string prefix = pad10(std::to_string(header.size()));
+
+   // 4. progress does not extend the deadline
+   {
+      ReceiveScenario s;
+      s.id = "deadline.trickle-is-cut-off";
+      s.description = "peer sends one byte every 40 ms, so the message would take over 3 s; "
+                      "every gap is far shorter than the 500 ms deadline, but the receiver gives up "
+                      "at the deadline";
+      s.segments = oneByteSegments(wire);
+      s.delayMillis = 40;
+      s.finish = PeerFinish::Close;
+      expectRejectionAtDeadline(s, SCENARIO_DEADLINE);
+      runScenario(s);
+   }
+
+   // a slow but complete message inside the deadline is accepted
+   {
+      ReceiveScenario s;
+      s.id = "deadline.slow-trickle-within-deadline-is-accepted";
+      s.description = "peer sends one byte every 20 ms (about 1.5 s in all) and the deadline is 6 s";
+      const std::string small = validTextWire("");
+      s.segments = oneByteSegments(small);
+      s.delayMillis = 20;
+      s.finish = PeerFinish::Close;
+      s.expect = Expect::Accept;
+      s.expectedText = "";
+      s.deadlineMillis = 6000;
+      s.maxElapsedMillis = 5500;
+      s.timeoutMillis = 11000;
+      runScenario(s);
+   }
+
+   // 5. a valid segmented message completed before the deadline
+   {
+      ReceiveScenario s;
+      s.id = "deadline.segmented-message-before-deadline";
+      s.description = "a valid message in five segments 40 ms apart, deadline 5 s";
+      const std::size_t n = wire.size();
+      s.segments = { wire.substr(0, 3), wire.substr(3, 12), wire.substr(15, 20),
+                     wire.substr(35, n - 35 - 5), wire.substr(n - 5) };
+      s.delayMillis = 40;
+      s.finish = PeerFinish::Close;
+      s.expect = Expect::Accept;
+      s.expectedText = "hello world";
+      s.deadlineMillis = 5000;
+      s.maxElapsedMillis = 3000;
+      s.timeoutMillis = 10000;
+      runScenario(s);
+   }
+
+   // 6. one deadline for prefix, header and payload together
+   {
+      ReceiveScenario s;
+      s.id = "deadline.spans-prefix-header-payload";
+      s.description = "prefix, header and payload arrive 350 ms apart: every read alone is well inside "
+                      "the 500 ms deadline, but the message needs 700 ms, so a deadline that restarted "
+                      "for each read would accept it";
+      s.segments = { prefix, header, "hello world" };
+      s.delayMillis = 350;
+      s.finish = PeerFinish::Hold;
+      expectRejectionAtDeadline(s, SCENARIO_DEADLINE);
+      runScenario(s);
+   }
+
+   // 7. the deadline starts when reconstitute() begins, not at the first byte
+   {
+      ReceiveScenario s;
+      s.id = "deadline.starts-on-entry";
+      s.description = "the peer is silent for 300 ms, then sends the prefix and header, then the "
+                      "payload 300 ms later: the message takes 300 ms from its first byte, but 600 ms "
+                      "from the start of the call, and the deadline is 500 ms";
+      s.segments = { wire.substr(0, wire.size() - 11), wire.substr(wire.size() - 11) };
+      s.initialDelayMillis = 300;
+      s.delayMillis = 300;
+      s.finish = PeerFinish::Hold;
+      expectRejectionAtDeadline(s, SCENARIO_DEADLINE);
+      runScenario(s);
+   }
+
+   // a zero budget is never an unlimited read
+   {
+      ReceiveScenario s;
+      s.id = "deadline.zero-with-silent-peer";
+      s.description = "deadline 0 and a silent peer: no waiting at all (not an unlimited wait)";
+      s.segments = {};
+      s.finish = PeerFinish::Hold;
       s.expect = Expect::Reject;
-      s.timeoutMillis = 3000;
+      s.deadlineMillis = 0;
+      s.maxElapsedMillis = 1500;
+      s.timeoutMillis = 5000;
+      runScenario(s);
+   }
+
+   {
+      ReceiveScenario s;
+      s.id = "deadline.zero-with-partial-message";
+      s.description = "deadline 0 and a message that is only partly available: rejected at once";
+      s.segments = { wire.substr(0, wire.size() - 1) };
+      s.finish = PeerFinish::Hold;
+      s.settleMillis = 200;
+      s.expect = Expect::Reject;
+      s.deadlineMillis = 0;
+      s.maxElapsedMillis = 1500;
+      s.timeoutMillis = 5000;
+      runScenario(s);
+   }
+
+   {
+      ReceiveScenario s;
+      s.id = "deadline.zero-with-complete-message";
+      s.description = "deadline 0 and a complete message that is already available: accepted without waiting";
+      s.segments = { wire };
+      s.finish = PeerFinish::Hold;
+      s.settleMillis = 200;
+      s.expect = Expect::Accept;
+      s.expectedText = "hello world";
+      s.deadlineMillis = 0;
+      s.maxElapsedMillis = 1500;
+      s.timeoutMillis = 5000;
+      runScenario(s);
+   }
+
+   // a very large deadline must not overflow
+   {
+      ReceiveScenario s;
+      s.id = "deadline.int-max";
+      s.description = "deadline INT_MAX with a valid message: accepted at once (no arithmetic overflow)";
+      s.segments = { wire };
+      s.finish = PeerFinish::Close;
+      s.expect = Expect::Accept;
+      s.expectedText = "hello world";
+      s.deadlineMillis = INT_MAX;
+      s.maxElapsedMillis = 3000;
+      s.timeoutMillis = 8000;
+      runScenario(s);
+   }
+
+   // 12. signals interrupting the reception
+   {
+      ReceiveScenario s;
+      s.id = "deadline.signals-do-not-fail-a-valid-message";
+      s.description = "a valid message in six segments 40 ms apart while SIGUSR1 interrupts the "
+                      "receiving thread every 2 ms";
+      const std::size_t n = wire.size();
+      s.segments = { wire.substr(0, 4), wire.substr(4, 8), wire.substr(12, 12),
+                     wire.substr(24, 12), wire.substr(36, n - 36 - 4), wire.substr(n - 4) };
+      s.delayMillis = 40;
+      s.finish = PeerFinish::Close;
+      s.expect = Expect::Accept;
+      s.expectedText = "hello world";
+      s.deadlineMillis = 5000;
+      s.signalIntervalMillis = 2;
+      s.maxElapsedMillis = 4000;
+      s.timeoutMillis = 10000;
+      runScenario(s);
+   }
+
+   {
+      ReceiveScenario s;
+      s.id = "deadline.signals-do-not-change-the-deadline";
+      s.description = "a silent peer while SIGUSR1 interrupts the receiving thread every 2 ms: the "
+                      "deadline is neither cut short nor extended";
+      s.segments = {};
+      s.finish = PeerFinish::Hold;
+      s.signalIntervalMillis = 2;
+      expectRejectionAtDeadline(s, SCENARIO_DEADLINE);
+      runScenario(s);
+   }
+
+   // the production default itself (10 s), through reconstitute(socket); it
+   // waits out the whole default, so it runs only when TONNERRE_TEST_SLOW is set
+   {
+      ReceiveScenario s;
+      s.id = "deadline.default-applies-to-reconstitute";
+      s.description = "reconstitute(socket) with a silent peer gives up at the 10 s default "
+                      "(opt-in: set TONNERRE_TEST_SLOW)";
+      s.segments = {};
+      s.finish = PeerFinish::Hold;
+      s.expect = Expect::Reject;
+      s.deadlineMillis = -1;
+      s.minElapsedMillis = 9000;
+      s.maxElapsedMillis = 11500;
+      s.timeoutMillis = 20000;
+      s.slowOptIn = true;
+      runScenario(s);
+   }
+}
+
+//******************************************************************************
+// T1c: the deadline for the response of send(service, response, deadline)
+//******************************************************************************
+
+void TestReceivePath::testResponseDeadline() {
+   TEST_CASE("receive path: the response deadline of send(service, response, deadline)");
+
+   {
+      ReceiveScenario s;
+      s.id = "response.deadline-override-with-slow-handler";
+      s.description = "the server's handler needs 1200 ms: a 400 ms response deadline fails (and the "
+                      "failed connection is not pooled), a 6000 ms one succeeds";
+      s.kind = Kind::ResponseDeadline;
+      s.handlerDelayMillis = 1200;
+      s.deadlineMillis = 400;
+      s.longDeadlineMillis = 6000;
+      s.minElapsedMillis = 360;
+      s.maxElapsedMillis = 400 + 1500;
+      s.timeoutMillis = 20000;
+      runScenario(s);
+   }
+}
+
+//******************************************************************************
+// T1c: arguments and constants
+//******************************************************************************
+
+void TestReceivePath::testDeadlineArguments() {
+   TEST_CASE("receive path: the default deadline and the rejection of negative deadlines");
+
+   // the production default is 10 seconds; it is not shortened for the tests
+   static_assert(Message::DEFAULT_RECEIVE_DEADLINE_MILLIS == 10000,
+                 "the default receive deadline is 10,000 ms");
+   require(Message::DEFAULT_RECEIVE_DEADLINE_MILLIS == 10000,
+           "the default receive deadline is 10,000 ms");
+
+   {
+      ReceiveScenario s;
+      s.id = "deadline.negative-reconstitute-is-rejected";
+      s.description = "reconstitute(socket, -1) and (socket, INT_MIN) return false without touching the "
+                      "message, the socket or the stream";
+      s.kind = Kind::NegativeReconstituteDeadline;
+      s.segments = { validTextWire("still waiting") };
+      s.expectedText = "still waiting";
+      s.timeoutMillis = 15000;
+      runScenario(s);
+   }
+
+   {
+      ReceiveScenario s;
+      s.id = "deadline.negative-send-is-rejected";
+      s.description = "send(service, response, -1) and (.., INT_MIN) return false and connect to nothing";
+      s.kind = Kind::NegativeSendDeadline;
+      s.timeoutMillis = 15000;
       runScenario(s);
    }
 }

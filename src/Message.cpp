@@ -1,6 +1,7 @@
 // Copyright Paul Dardeau, SwampBits LLC 2014
 // BSD License
 
+#include <chrono>
 #include <limits>
 #include <memory>
 #include <set>
@@ -78,13 +79,60 @@ bool parseWireLength(const std::string& text, std::size_t& value) {
    return true;
 }
 
-// Reads exactly 'count' bytes from the socket. Socket::readSocket() returns
-// the number of bytes actually received, which is short when the peer closes
-// or the connection fails mid-read (and -1 when nothing could be read), so the
-// read succeeded only if that number equals the number requested. The caller
-// must already have checked 'count' against a protocol limit; the check here
-// only guarantees the count can be handed to readSocket() as an int.
-bool readExact(Socket* socket, std::size_t count, std::string& bytes) {
+// The single deadline of one message: started when reception begins and never
+// restarted, so that bytes which keep arriving cannot extend it. It uses the
+// monotonic clock, which wall-clock changes do not affect.
+class ReceiveDeadline {
+public:
+   typedef std::chrono::steady_clock Clock;
+
+   // millis must be 0 or more (the callers reject negative values)
+   explicit ReceiveDeadline(int millis) :
+      m_millis(millis),
+      m_start(Clock::now()) {
+   }
+
+   int totalMillis() const {
+      return m_millis;
+   }
+
+   // The milliseconds that are left, rounded up (so that a fraction of a
+   // millisecond is never lost). Never negative and never more than the whole
+   // deadline; 0 once it is used up. The value is handed on as 0 and not as
+   // "unlimited": the bounded read treats a negative time as no limit, so this
+   // must not become negative.
+   int remainingMillis() const {
+      const Clock::duration left =
+         std::chrono::milliseconds(m_millis) - (Clock::now() - m_start);
+      if (left <= Clock::duration::zero()) {
+         return 0;
+      }
+      const long long millis = std::chrono::ceil<std::chrono::milliseconds>(left).count();
+      return (millis > m_millis) ? m_millis : static_cast<int>(millis);
+   }
+
+   bool isExpired() const {
+      return (Clock::now() - m_start) >= std::chrono::milliseconds(m_millis);
+   }
+
+private:
+   int m_millis;
+   Clock::time_point m_start;
+};
+
+// Reads exactly 'count' bytes from the socket, using no more time than is left
+// of the message's deadline (the budget is handed to the three-argument
+// Socket::readSocket(), which waits with poll() against it; SO_RCVTIMEO is not
+// used because it is only an inactivity timeout). Socket::readSocket() returns
+// the number of bytes actually received, which is short when the deadline passes,
+// the peer closes or the connection fails mid-read (and -1 when nothing could be
+// read), so the read succeeded only if that number equals the number requested.
+// The caller must already have checked 'count' against a protocol limit; the
+// check here only guarantees the count can be handed to readSocket() as an int.
+bool readExact(Socket* socket,
+               std::size_t count,
+               std::string& bytes,
+               const ReceiveDeadline& deadline) {
    bytes.clear();
 
    if (count == 0) {
@@ -97,7 +145,9 @@ bool readExact(Socket* socket, std::size_t count, std::string& bytes) {
 
    std::string buffer(count, '\0');
    const int requested = static_cast<int>(count);
-   const int received = socket->readSocket(&buffer[0], requested);
+   const int received = socket->readSocket(&buffer[0],
+                                           requested,
+                                           deadline.remainingMillis());
 
    if (received != requested) {
       return false;
@@ -272,6 +322,19 @@ bool Message::send(const std::string& serviceName) {
 //******************************************************************************
 
 bool Message::send(const std::string& serviceName, Message& responseMessage) {
+   return send(serviceName, responseMessage, DEFAULT_RECEIVE_DEADLINE_MILLIS);
+}
+
+//******************************************************************************
+
+bool Message::send(const std::string& serviceName,
+                   Message& responseMessage,
+                   int responseDeadlineMillis) {
+   if (responseDeadlineMillis < 0) {
+      Logger::error("unable to send message, the response deadline is negative");
+      return false;
+   }
+
    if (m_messageType == MessageTypeUnknown) {
       Logger::error("unable to send message, no message type set");
       return false;
@@ -289,7 +352,7 @@ bool Message::send(const std::string& serviceName, Message& responseMessage) {
       if (socket->write(wireMessage)) {
          // a failed reconstitute() closes the connection, and
          // returnSocketForService() does not pool a closed socket
-         const bool rc = responseMessage.reconstitute(socket);
+         const bool rc = responseMessage.reconstitute(socket, responseDeadlineMillis);
          returnSocketForService(serviceName, socket);
          return rc;
       } else {
@@ -423,10 +486,11 @@ std::string Message::readSocketBytes(Socket* socket,
                                      int numberBytes,
                                      bool& success) {
    std::string bytes;
+   const ReceiveDeadline deadline(DEFAULT_RECEIVE_DEADLINE_MILLIS);
 
    success = (socket != nullptr) &&
              (numberBytes >= 0) &&
-             readExact(socket, static_cast<std::size_t>(numberBytes), bytes);
+             readExact(socket, static_cast<std::size_t>(numberBytes), bytes, deadline);
 
    if (!success) {
       Logger::error("reading socket failed, the requested bytes did not arrive");
@@ -449,11 +513,40 @@ void Message::clearReceivedState() {
 //******************************************************************************
 
 bool Message::reconstitute(Socket* socket) {
+   return reconstitute(socket, DEFAULT_RECEIVE_DEADLINE_MILLIS);
+}
+
+//******************************************************************************
+
+bool Message::reconstitute(Socket* socket, int deadlineMillis) {
    if (socket == nullptr) {
       // no socket given
       Logger::error("no socket given to reconstitute");
       return false;
    }
+
+   if (deadlineMillis < 0) {
+      // a caller's mistake, found before anything was read: the stream is
+      // untouched, so the socket is left as it was
+      Logger::error("negative receive deadline given to reconstitute");
+      return false;
+   }
+
+   // one deadline for the whole message, started now
+   const ReceiveDeadline deadline(deadlineMillis);
+
+   // describes a read that did not complete, and says if that is because the
+   // deadline had passed (an early end of stream or error is not)
+   auto incomplete = [&deadline](const char* what) {
+      std::string text(what);
+      text += " incomplete";
+      if (deadline.isExpired()) {
+         text += " (receive deadline of " +
+                 StrUtils::size_tToString(static_cast<std::size_t>(deadline.totalMillis())) +
+                 " ms exceeded)";
+      }
+      return text;
+   };
 
    // Everything is read and validated into locals first; the message is
    // modified only once the complete message has been received.
@@ -468,8 +561,8 @@ bool Message::reconstitute(Socket* socket) {
       // header-length prefix: exactly 10 characters, a decimal number padded
       // on the right with spaces
       std::string prefix;
-      if (!readExact(socket, NUM_CHARS_HEADER_LENGTH, prefix)) {
-         problem = "header-length prefix incomplete";
+      if (!readExact(socket, NUM_CHARS_HEADER_LENGTH, prefix, deadline)) {
+         problem = incomplete("header-length prefix");
          break;
       }
 
@@ -493,8 +586,8 @@ bool Message::reconstitute(Socket* socket) {
       }
 
       std::string headerAsString;
-      if (!readExact(socket, headerLength, headerAsString)) {
-         problem = "header incomplete";
+      if (!readExact(socket, headerLength, headerAsString, deadline)) {
+         problem = incomplete("header");
          break;
       }
 
@@ -539,8 +632,8 @@ bool Message::reconstitute(Socket* socket) {
       }
 
       std::string payloadAsString;
-      if (!readExact(socket, payloadLength, payloadAsString)) {
-         problem = "payload incomplete";
+      if (!readExact(socket, payloadLength, payloadAsString, deadline)) {
+         problem = incomplete("payload");
          break;
       }
 

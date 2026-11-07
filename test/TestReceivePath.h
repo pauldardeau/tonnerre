@@ -13,14 +13,14 @@ struct ReceiveScenario;
 /**
  * Receive-path regression coverage for tonnerre::Message::reconstitute():
  * malformed length prefixes (T0 defect D-1/D-4), truncated messages (D-2),
- * payload-size boundaries (D-3) and stalled peers (D-8).
+ * payload-size boundaries (D-3), stalled peers and the receive deadline (D-8),
+ * and the response deadline of Message::send(service, response, deadline).
  *
  * Every scenario runs in a forked child process (see IsolatedCase.h) against
  * a real loopback TCP connection on a kernel-chosen port, so a crash, a hang
  * or a sanitizer report in the code under test cannot take the runner down.
- * The expectations describe the *desired* behavior; scenarios that currently
- * fail are annotated with the defect they expose (see knownDefectFor() in
- * TestReceivePath.cpp) rather than weakened.
+ * Deadline scenarios pass sub-second deadlines explicitly; the 10 s production
+ * default is not shortened for the tests.
  */
 class TestReceivePath : public tonnerre_test::TonnerreTestSuite {
 public:
@@ -37,6 +37,9 @@ protected:
    void testPeerResetDuringMessage();
    void testPayloadSizeBoundaries();
    void testStalledPeer();
+   void testReceiveDeadline();
+   void testResponseDeadline();
+   void testDeadlineArguments();
 
    // runs one scenario in an isolated child process and records the outcome
    void runScenario(const ReceiveScenario& scenario);
