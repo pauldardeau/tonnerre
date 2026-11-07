@@ -9,6 +9,7 @@
 #include <cstring>
 #include <fstream>
 #include <memory>
+#include <mutex>
 #include <string>
 #include <thread>
 #include <utility>
@@ -31,6 +32,7 @@
 #include "Messaging.h"
 #include "KeyValuePairs.h"
 #include "BasicException.h"
+#include "Logger.h"
 #include "ServiceInfo.h"
 #include "Socket.h"
 
@@ -71,7 +73,8 @@ enum class Kind {
    ServerResponse,             // MessageRequestHandler writing a response of a given size
    ResponseDeadline,           // send(service, response, deadline) against a slow handler
    NegativeReconstituteDeadline,   // reconstitute(socket, negative) is rejected untouched
-   NegativeSendDeadline        // send(service, response, negative) is rejected, nothing sent
+   NegativeSendDeadline,       // send(service, response, negative) is rejected, nothing sent
+   DisconnectedClientResponse  // the server's response write to a client that has gone (SIGPIPE, D-7)
 };
 
 struct ReceiveScenario {
@@ -271,6 +274,9 @@ const int EXIT_TOO_LATE            = 36;   // took much longer than the deadline
 const int EXIT_DEADLINE_OVERRIDE   = 37;   // a response deadline was not honoured
 const int EXIT_NEGATIVE_MISHANDLED = 38;   // a negative deadline was not rejected cleanly
 const int EXIT_NO_SIGNALS          = 39;   // the signal storm delivered no signal (the test would prove nothing)
+const int EXIT_NOT_DISCONNECTED    = 40;   // the disconnected-write condition could not be established (the test would prove nothing)
+const int EXIT_WRITE_NOT_FAILED    = 41;   // the server did not report a failed response write
+const int EXIT_SERVER_UNUSABLE     = 42;   // the server did not serve the request that followed
 
 //******************************************************************************
 // Signals: SIGUSR1 delivered to the receiving thread every few milliseconds, with
@@ -370,6 +376,7 @@ int runServeScenarioInChild(const ReceiveScenario& scenario);
 int runResponseDeadlineScenarioInChild(const ReceiveScenario& scenario);
 int runNegativeReconstituteScenarioInChild(const ReceiveScenario& scenario);
 int runNegativeSendScenarioInChild(const ReceiveScenario& scenario);
+int runDisconnectedClientScenarioInChild(const ReceiveScenario& scenario);
 
 // Runs inside the forked child.
 int runScenarioInChild(const ReceiveScenario& scenario) {
@@ -384,6 +391,8 @@ int runScenarioInChild(const ReceiveScenario& scenario) {
          return runNegativeReconstituteScenarioInChild(scenario);
       case Kind::NegativeSendDeadline:
          return runNegativeSendScenarioInChild(scenario);
+      case Kind::DisconnectedClientResponse:
+         return runDisconnectedClientScenarioInChild(scenario);
       default:
          return runSendScenarioInChild(scenario);
    }
@@ -845,12 +854,23 @@ private:
    int m_delayMillis;
 };
 
+// What a RequestServer lets a scenario see of the connection it is serving (optional)
+struct ServerObservation {
+   std::atomic<int> servingFd{-1};            // the accepted descriptor, published before its request is handled
+   std::atomic<int> completedRuns{0};         // connections whose request handling has finished
+   std::atomic<int> connectedAfterFirstRun{-1};   // the first connection's Socket::isConnected() after its run (-1: not yet)
+};
+
 // Serves the connections that arrive at an endpoint, one at a time, with a real
 // MessageRequestHandler, until it is stopped
 class RequestServer {
 public:
    RequestServer(const ListeningEndpoint& endpoint, tonnerre::MessageHandler* handler) :
-      m_endpoint(endpoint), m_handler(handler), m_stop(false) {
+      m_endpoint(endpoint), m_handler(handler), m_observation(nullptr), m_stop(false) {
+   }
+
+   void observe(ServerObservation* observation) {
+      m_observation = observation;
    }
 
    void start() {
@@ -875,23 +895,35 @@ private:
             continue;
          }
          // the request handler owns the socket and closes it when deleted
-         MessageRequestHandler* requestHandler =
-            new MessageRequestHandler(new chaudiere::Socket(fd), m_handler);
+         chaudiere::Socket* socket = new chaudiere::Socket(fd);
+         if (m_observation != nullptr) {
+            m_observation->servingFd = fd;
+         }
+         MessageRequestHandler* requestHandler = new MessageRequestHandler(socket, m_handler);
          requestHandler->run();
+         if ((m_observation != nullptr) && (m_observation->completedRuns == 0)) {
+            m_observation->connectedAfterFirstRun = socket->isConnected() ? 1 : 0;
+         }
          delete requestHandler;
+         if (m_observation != nullptr) {
+            ++m_observation->completedRuns;
+         }
       }
    }
 
    const ListeningEndpoint& m_endpoint;
    tonnerre::MessageHandler* m_handler;
+   ServerObservation* m_observation;
    std::atomic<bool> m_stop;
    std::thread m_thread;
 };
 
 int runResponseDeadlineScenarioInChild(const ReceiveScenario& scenario) {
-   // the server's late answer to a connection that the client has already given
-   // up on must not be able to kill this process (SIGPIPE is a separate defect)
-   ::signal(SIGPIPE, SIG_IGN);
+   // SIGPIPE has its default disposition here (set explicitly: the runner may have
+   // inherited SIG_IGN): the server's late answer to a connection that the client has
+   // already given up on must not be able to kill this process. Chaudiere's sends
+   // suppress the signal themselves; the process does not.
+   ::signal(SIGPIPE, SIG_DFL);
 
    ListeningEndpoint endpoint;
    if (!endpoint.ok()) {
@@ -972,6 +1004,313 @@ int runResponseDeadlineScenarioInChild(const ReceiveScenario& scenario) {
    }
 
    return EXIT_MET;
+}
+
+//******************************************************************************
+// A client that has gone away before the response is written (T1d, D-7): the
+// server's write must fail, not kill the process with SIGPIPE
+//******************************************************************************
+
+// the flags of the scenario's own raw writes: they must not be able to raise SIGPIPE
+// themselves, so that only the production write is at risk
+#ifdef MSG_NOSIGNAL
+const int RAW_WRITE_FLAGS = MSG_NOSIGNAL;
+#else
+const int RAW_WRITE_FLAGS = 0;
+#endif
+
+// Records what a Logger is given, so that a scenario can see the errors that
+// production code reports
+class CapturingLogger : public chaudiere::Logger {
+public:
+   chaudiere::LogLevel getLogLevel() const override { return chaudiere::Verbose; }
+   void setLogLevel(chaudiere::LogLevel) override {}
+   bool isLoggingInstanceLifecycles() const override { return false; }
+   void setLogInstanceLifecycles(bool) override {}
+   void logInstanceCreate(const std::string&) override {}
+   void logInstanceDestroy(const std::string&) override {}
+   bool isLoggingLevel(chaudiere::LogLevel) const override { return true; }
+   void logOccurrence(const std::string&, const std::string&) override {}
+
+   void logMessage(chaudiere::LogLevel, const std::string& message) override {
+      std::lock_guard<std::mutex> lock(m_mutex);
+      m_messages.push_back(message);
+   }
+
+   bool seen(const std::string& text) const {
+      std::lock_guard<std::mutex> lock(m_mutex);
+      for (const std::string& message : m_messages) {
+         if (message.find(text) != std::string::npos) {
+            return true;
+         }
+      }
+      return false;
+   }
+
+private:
+   mutable std::mutex m_mutex;
+   std::vector<std::string> m_messages;
+};
+
+// what the handler of the doomed request established on the server's connection
+struct DisconnectEvidence {
+   std::atomic<bool> handlerEntered{false};
+   std::atomic<bool> clientEofSeen{false};        // the client's close has reached the server's socket
+   std::atomic<int> firstWriteAfterClose{0};      // result of the first raw write to the closed client
+   std::atomic<bool> resetSeen{false};            // the reset that answered it has reached the server's socket
+   std::atomic<int> writesUntilBroken{0};         // raw writes made after the reset, up to the first EPIPE
+   std::atomic<bool> epipeEstablished{false};     // a raw write failed with EPIPE: the next write meets a broken connection
+};
+
+const char DOOMED_REQUEST[] = "doomedRequest";
+const char FOLLOW_UP_REQUEST[] = "followUpRequest";
+
+// Waits at most timeoutMillis for the peer's close to reach fd (poll() returns as soon as it does).
+bool waitUntilPeerClosed(int fd, int timeoutMillis) {
+   const std::chrono::steady_clock::time_point began = std::chrono::steady_clock::now();
+   while (millisSince(began) < timeoutMillis) {
+      pollfd p;
+      p.fd = fd;
+      p.events = POLLIN;
+      p.revents = 0;
+      if (::poll(&p, 1, 50) > 0) {
+         char byte;
+         const ssize_t n = ::recv(fd, &byte, 1, MSG_PEEK | MSG_DONTWAIT);
+         if (n == 0) {
+            return true;             // orderly close
+         }
+         if ((n < 0) && (errno != EAGAIN) && (errno != EWOULDBLOCK) && (errno != EINTR)) {
+            return true;             // the connection is already broken
+         }
+         if (n > 0) {
+            return false;            // the client sent more instead of closing
+         }
+      }
+   }
+   return false;
+}
+
+// Waits at most timeoutMillis for a reset (error or hang-up, reported whatever is asked for) on fd.
+bool waitForReset(int fd, int timeoutMillis) {
+   const std::chrono::steady_clock::time_point began = std::chrono::steady_clock::now();
+   while (millisSince(began) < timeoutMillis) {
+      pollfd p;
+      p.fd = fd;
+      p.events = 0;
+      p.revents = 0;
+      if ((::poll(&p, 1, 50) > 0) && ((p.revents & (POLLERR | POLLHUP)) != 0)) {
+         return true;
+      }
+   }
+   return false;
+}
+
+// Answers the doomed request only after the client has gone, and first brings the
+// server's connection into the state in which a write fails with EPIPE (which is when
+// the kernel raises SIGPIPE for a send that does not suppress it).
+//
+// A write to a peer that has closed is not enough on its own: the first one is accepted
+// locally (and answered by a reset), and the one after the reset may report ECONNRESET
+// instead; only then does a write fail with EPIPE. So the handler waits for the client's
+// close to reach it, makes that first write itself, waits for the reset, and writes again
+// until one fails with EPIPE. Every wait is bounded and ends as soon as its event occurs.
+class DisconnectedClientHandler : public tonnerre::MessageHandler {
+public:
+   DisconnectedClientHandler(const ServerObservation& observation, DisconnectEvidence& evidence) :
+      m_observation(observation), m_evidence(evidence) {
+   }
+
+   void handleTextMessage(const Message&,
+                          Message&,
+                          const std::string& requestName,
+                          const std::string&,
+                          std::string& responsePayload) override {
+      if (requestName == DOOMED_REQUEST) {
+         m_evidence.handlerEntered = true;
+         establishDisconnectedWrite(m_observation.servingFd);
+         responsePayload = "a response for a client that has gone";
+      } else {
+         responsePayload = "still serving";
+      }
+   }
+
+   void handleKeyValuesMessage(const Message&,
+                               Message&,
+                               const std::string&,
+                               const chaudiere::KeyValuePairs&,
+                               chaudiere::KeyValuePairs&) override {
+   }
+
+private:
+   void establishDisconnectedWrite(int fd) {
+      const int WAIT_MILLIS = 5000;
+
+      m_evidence.clientEofSeen = waitUntilPeerClosed(fd, WAIT_MILLIS);
+      if (!m_evidence.clientEofSeen) {
+         return;
+      }
+
+      m_evidence.firstWriteAfterClose = static_cast<int>(::send(fd, "x", 1, RAW_WRITE_FLAGS));
+
+      m_evidence.resetSeen = waitForReset(fd, WAIT_MILLIS);
+      if (!m_evidence.resetSeen) {
+         return;
+      }
+
+      for (int attempt = 1; attempt <= 3; ++attempt) {
+         errno = 0;
+         const ssize_t rc = ::send(fd, "x", 1, RAW_WRITE_FLAGS);
+         const int error = errno;
+         m_evidence.writesUntilBroken = attempt;
+         if ((rc < 0) && (error == EPIPE)) {
+            m_evidence.epipeEstablished = true;
+            return;
+         }
+      }
+   }
+
+   const ServerObservation& m_observation;
+   DisconnectEvidence& m_evidence;
+};
+
+// true once counter has reached target, waiting at most timeoutMillis
+bool waitForCount(const std::atomic<int>& counter, int target, int timeoutMillis) {
+   const std::chrono::steady_clock::time_point began = std::chrono::steady_clock::now();
+   while (counter < target) {
+      if (millisSince(began) >= timeoutMillis) {
+         return false;
+      }
+      std::this_thread::sleep_for(std::chrono::milliseconds(2));
+   }
+   return true;
+}
+
+const char* dispositionName(void (*handler)(int)) {
+   if (handler == SIG_DFL) {
+      return "SIG_DFL";
+   }
+   if (handler == SIG_IGN) {
+      return "SIG_IGN";
+   }
+   return "a handler";
+}
+
+// A real client (Message::send with a short response deadline) gives up on a server whose
+// handler is slow; the real MessageRequestHandler then writes its response to the closed
+// connection, which has been brought into the EPIPE state. Required:
+//   * the server attempted the write and it failed (reported through the Logger),
+//   * the process survived it, with SIGPIPE at its default disposition,
+//   * the failed client connection was not pooled, and
+//   * the server then served the next request.
+int runDisconnectedClientScenarioInChild(const ReceiveScenario& scenario) {
+   // SIGPIPE at its default disposition, set explicitly: the runner may have inherited
+   // SIG_IGN, which would hide the defect. The process would be killed by the signal
+   // unless the write suppresses it.
+   void (*const previous)(int) = ::signal(SIGPIPE, SIG_DFL);
+
+   ListeningEndpoint endpoint;
+   if (!endpoint.ok()) {
+      printf("RESULT setup failed (listening socket)\n");
+      return EXIT_SETUP_FAILED;
+   }
+
+   CapturingLogger* logger = new CapturingLogger();
+   chaudiere::Logger::setLogger(logger);
+
+   Messaging* messagingObject = new Messaging();
+   chaudiere::ServiceInfo info("t1dService", "127.0.0.1", endpoint.port());
+   info.setPersistentConnection(true);
+   messagingObject->registerService("t1dService", info);
+   Messaging::setMessaging(messagingObject);
+   std::shared_ptr<Messaging> messaging = Messaging::getMessaging();
+
+   ServerObservation observation;
+   DisconnectEvidence evidence;
+   DisconnectedClientHandler handler(observation, evidence);
+   RequestServer server(endpoint, &handler);
+   server.observe(&observation);
+   server.start();
+
+   int result = EXIT_MET;
+   long long elapsed = 0;
+   bool received = true;
+   bool pooledDeadSocket = false;
+   bool writeFailureReported = false;
+
+   // 1. the client gives up long before the handler answers
+   {
+      Message request(DOOMED_REQUEST, MessageTypeText);
+      request.setTextPayload("please answer");
+      Message response;
+
+      const std::chrono::steady_clock::time_point began = std::chrono::steady_clock::now();
+      received = request.send("t1dService", response, scenario.deadlineMillis);
+      elapsed = millisSince(began);
+
+      if (received) {
+         result = EXIT_DEADLINE_OVERRIDE;
+      } else if ((response.getType() != MessageTypeUnknown) || !response.getTextPayload().empty()) {
+         result = EXIT_STATE_NOT_CLEARED;
+      } else {
+         result = timingResult(scenario, elapsed);
+      }
+
+      if (result == EXIT_MET) {
+         // the failed connection must not have gone back to the pool
+         chaudiere::Socket* next = messaging->socketForService(info);
+         pooledDeadSocket = (next == nullptr) || !next->isConnected();
+         delete next;
+         if (pooledDeadSocket) {
+            result = EXIT_DEAD_SOCKET_POOLED;
+         }
+      }
+   }
+
+   // the server's handling of that connection has to be over before anything is concluded
+   const bool firstRunDone = waitForCount(observation.completedRuns, 1, 10000);
+   writeFailureReported = logger->seen("writing response message to socket failed");
+
+   printf("RESULT SIGPIPE was %s, now SIG_DFL; client send=%s after %lld ms; server: handler=%s clientEof=%s "
+          "firstWriteAfterClose=%d reset=%s writesUntilEPIPE=%d epipe=%s; response write failure reported=%s "
+          "socketConnectedAfterRun=%d runDone=%s\n",
+          dispositionName(previous), received ? "true" : "false", elapsed,
+          evidence.handlerEntered ? "entered" : "NOT entered", evidence.clientEofSeen ? "yes" : "no",
+          evidence.firstWriteAfterClose.load(), evidence.resetSeen ? "yes" : "no",
+          evidence.writesUntilBroken.load(), evidence.epipeEstablished ? "yes" : "no",
+          writeFailureReported ? "yes" : "no", observation.connectedAfterFirstRun.load(),
+          firstRunDone ? "yes" : "no");
+
+   if (result == EXIT_MET) {
+      if (!firstRunDone || !evidence.handlerEntered || !evidence.clientEofSeen ||
+          !evidence.resetSeen || !evidence.epipeEstablished) {
+         // the write to a vanished client was never put in the state that raises SIGPIPE:
+         // surviving it would prove nothing
+         result = EXIT_NOT_DISCONNECTED;
+      } else if (!writeFailureReported || (observation.connectedAfterFirstRun != 1)) {
+         // no failed response write was reported, or the Socket refused to write at all
+         // because it believed itself closed
+         result = EXIT_WRITE_NOT_FAILED;
+      }
+   }
+
+   // 2. the server is still there: the next request is served
+   if (result == EXIT_MET) {
+      Message request(FOLLOW_UP_REQUEST, MessageTypeText);
+      request.setTextPayload("are you there");
+      Message response;
+
+      const bool served = request.send("t1dService", response, scenario.longDeadlineMillis);
+      printf("RESULT follow-up request: send=%s response='%s'\n", served ? "true" : "false",
+             response.getTextPayload().c_str());
+      if (!served || (response.getType() != MessageTypeText) ||
+          (response.getTextPayload() != "still serving")) {
+         result = EXIT_SERVER_UNUSABLE;
+      }
+   }
+
+   server.stopAndJoin();
+   chaudiere::Logger::shutdown();
+   return result;
 }
 
 // reconstitute(socket, negative) is a caller's mistake: it is rejected before
@@ -1105,6 +1444,9 @@ void TestReceivePath::runScenario(const ReceiveScenario& scenarioIn) {
    } else if (result.outcome == IsolatedResult::Signaled) {
       ++tally.crashes;
       problem = "CRASH: child terminated by " + signalName(result.signalNumber);
+      if (result.signalNumber == SIGPIPE) {
+         problem += " (a write to a disconnected peer was not protected against SIGPIPE)";
+      }
    } else if (!result.sanitizerFinding.empty()) {
       ++tally.sanitizerFindings;
       problem = "SANITIZER: " + result.sanitizerFinding;
@@ -1164,6 +1506,17 @@ void TestReceivePath::runScenario(const ReceiveScenario& scenarioIn) {
             break;
          case EXIT_NO_SIGNALS:
             problem = "the signal storm delivered no signal, so the scenario proved nothing";
+            break;
+         case EXIT_NOT_DISCONNECTED:
+            problem = "the write to a disconnected client could not be put in the state that raises SIGPIPE "
+                      "(client close, reset or EPIPE not observed), so the scenario proved nothing";
+            break;
+         case EXIT_WRITE_NOT_FAILED:
+            problem = "the server did not attempt, or did not report the failure of, its response write "
+                      "to the disconnected client";
+            break;
+         case EXIT_SERVER_UNUSABLE:
+            problem = "after the failed response write the server did not serve the next request";
             break;
          default:
             problem = "child exited with unexpected status " + std::to_string(result.exitCode);
@@ -1225,6 +1578,7 @@ void TestReceivePath::runTests() {
    testReceiveDeadline();
    testResponseDeadline();
    testDeadlineArguments();
+   testDisconnectedClientResponse();
 }
 
 //******************************************************************************
@@ -2150,6 +2504,30 @@ void TestReceivePath::testDeadlineArguments() {
       s.description = "send(service, response, -1) and (.., INT_MIN) return false and connect to nothing";
       s.kind = Kind::NegativeSendDeadline;
       s.timeoutMillis = 15000;
+      runScenario(s);
+   }
+}
+
+//******************************************************************************
+// T1d: a response written to a client that has gone away (D-7)
+//******************************************************************************
+
+void TestReceivePath::testDisconnectedClientResponse() {
+   TEST_CASE("server path: a response written to a client that has gone away does not kill the server");
+
+   {
+      ReceiveScenario s;
+      s.id = "server.write-to-disconnected-client-survives";
+      s.description = "the client gives up after 300 ms and disconnects; the server's response write to "
+                      "the closed connection (brought into the EPIPE state first) fails without raising "
+                      "SIGPIPE, the process survives with SIGPIPE at its default disposition, the failed "
+                      "client connection is not pooled, and the server serves the next request";
+      s.kind = Kind::DisconnectedClientResponse;
+      s.deadlineMillis = 300;
+      s.longDeadlineMillis = 6000;
+      s.minElapsedMillis = 270;
+      s.maxElapsedMillis = 300 + 1500;
+      s.timeoutMillis = 20000;
       runScenario(s);
    }
 }

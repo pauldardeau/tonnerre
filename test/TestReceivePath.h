@@ -14,7 +14,8 @@ struct ReceiveScenario;
  * Receive-path regression coverage for tonnerre::Message::reconstitute():
  * malformed length prefixes (T0 defect D-1/D-4), truncated messages (D-2),
  * payload-size boundaries (D-3), stalled peers and the receive deadline (D-8),
- * and the response deadline of Message::send(service, response, deadline).
+ * the response deadline of Message::send(service, response, deadline), and the server's
+ * response write to a client that has gone away (SIGPIPE, D-7).
  *
  * Every scenario runs in a forked child process (see IsolatedCase.h) against
  * a real loopback TCP connection on a kernel-chosen port, so a crash, a hang
@@ -40,6 +41,7 @@ protected:
    void testReceiveDeadline();
    void testResponseDeadline();
    void testDeadlineArguments();
+   void testDisconnectedClientResponse();
 
    // runs one scenario in an isolated child process and records the outcome
    void runScenario(const ReceiveScenario& scenario);
