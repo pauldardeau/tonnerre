@@ -37,5 +37,9 @@ jobs:
         run: cmake -S . -B build
       - name: Build
         run: cmake --build build
-      - name: Test
-        run: ctest --test-dir build --output-on-failure
+      - name: Test (fast)
+        run: ctest --test-dir build --output-on-failure -LE slow
+      - name: Test (production default receive deadline, waits 10 s)
+        # one scenario that waits out the whole 10 s default receive deadline
+        # (label "slow"), kept out of the fast run so the wait is paid once
+        run: ctest --test-dir build --output-on-failure -L slow --no-tests=error

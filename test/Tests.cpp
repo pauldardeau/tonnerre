@@ -84,9 +84,10 @@ void run_tests() {
 }
 
 void printUsage(const char* program) {
-   printf("usage: %s [--group all|unit] [--suite <SuiteName>]\n", program);
+   printf("usage: %s [--group all|unit] [--suite <SuiteName>] [--scenario <ScenarioId>]\n", program);
    printf("  all    every suite and every isolated scenario (default)\n");
    printf("  unit   the same as all (there are no known defects to set apart any more)\n");
+   printf("  --scenario  run only the isolated receive-path scenario with this id (fails if none runs)\n");
    printf("set TONNERRE_TEST_SLOW=1 to include the scenario that waits out the 10 s default deadline\n");
    printf("set TONNERRE_TEST_VERBOSE=1 to show what passing receive-path scenarios observed\n");
 }
@@ -110,6 +111,8 @@ int main(int argc, char* argv[]) {
          }
       } else if ((arg == "--suite") && (i + 1 < argc)) {
          runConfig().suiteFilter = argv[++i];
+      } else if ((arg == "--scenario") && (i + 1 < argc)) {
+         runConfig().scenarioFilter = argv[++i];
       } else {
          printUsage(argv[0]);
          return 64;
@@ -137,6 +140,11 @@ int main(int argc, char* argv[]) {
    if ((g_totals.suitesRun == 0) || (testCases == 0) || (g_totals.assertions == 0)) {
       exitCode = 2;
       reason = "no tests were executed";
+   } else if (!runConfig().scenarioFilter.empty() && (tally.run == 0)) {
+      // a misspelled id, or an opt-in scenario whose environment variable is not
+      // set, must not pass just because other assertions ran
+      exitCode = 2;
+      reason = "no scenario named '" + runConfig().scenarioFilter + "' was run";
    } else if (g_totals.failures > 0) {
       exitCode = 1;
       reason = std::to_string(g_totals.failures) + " failed assertion(s)";
@@ -148,10 +156,12 @@ int main(int argc, char* argv[]) {
    const char* groupName = (runConfig().group == Group::Unit) ? "unit" : "all";
 
    printf("\n=============================================================\n");
-   printf("Tonnerre test summary (group: %s%s%s)\n",
+   printf("Tonnerre test summary (group: %s%s%s%s%s)\n",
           groupName,
           runConfig().suiteFilter.empty() ? "" : ", suite: ",
-          runConfig().suiteFilter.c_str());
+          runConfig().suiteFilter.c_str(),
+          runConfig().scenarioFilter.empty() ? "" : ", scenario: ",
+          runConfig().scenarioFilter.c_str());
    printf("  suites run:        %d\n", g_totals.suitesRun);
    printf("  test cases:        %d\n", testCases);
    printf("  assertions:        %d\n", g_totals.assertions);

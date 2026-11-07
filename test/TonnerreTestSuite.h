@@ -26,6 +26,7 @@ enum class Group {
 struct RunConfig {
    Group group = Group::All;
    std::string suiteFilter;    // empty: every suite
+   std::string scenarioFilter; // empty: every isolated receive-path scenario; otherwise only the one with this id
 };
 
 inline RunConfig& runConfig() {

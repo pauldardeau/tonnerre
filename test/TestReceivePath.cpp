@@ -1073,6 +1073,12 @@ TestReceivePath::TestReceivePath() :
 void TestReceivePath::runScenario(const ReceiveScenario& scenarioIn) {
    const ReceiveScenario& scenario = scenarioIn;
 
+   // --scenario <id>: only that scenario (the runner fails if none matched)
+   const std::string& onlyScenario = runConfig().scenarioFilter;
+   if (!onlyScenario.empty() && (scenario.id != onlyScenario)) {
+      return;
+   }
+
    // scenarios that wait out the 10 s production default run only on request
    if (scenario.slowOptIn) {
       const char* slow = std::getenv("TONNERRE_TEST_SLOW");
