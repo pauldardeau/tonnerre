@@ -1057,9 +1057,10 @@ struct DisconnectEvidence {
    std::atomic<bool> handlerEntered{false};
    std::atomic<bool> clientEofSeen{false};        // the client's close has reached the server's socket
    std::atomic<int> firstWriteAfterClose{0};      // result of the first raw write to the closed client
-   std::atomic<bool> resetSeen{false};            // the reset that answered it has reached the server's socket
-   std::atomic<int> writesUntilBroken{0};         // raw writes made after the reset, up to the first EPIPE
+   std::atomic<bool> resetSeen{false};            // a raw write has reported the reset that answered it (ECONNRESET or EPIPE)
+   std::atomic<int> writesUntilBroken{0};         // raw writes made after the first one, up to the first EPIPE
    std::atomic<bool> epipeEstablished{false};     // a raw write failed with EPIPE: the next write meets a broken connection
+   std::atomic<int> unexpectedError{0};           // errno of a raw write that failed in any other way (0: none)
 };
 
 const char DOOMED_REQUEST[] = "doomedRequest";
@@ -1090,21 +1091,6 @@ bool waitUntilPeerClosed(int fd, int timeoutMillis) {
    return false;
 }
 
-// Waits at most timeoutMillis for a reset (error or hang-up, reported whatever is asked for) on fd.
-bool waitForReset(int fd, int timeoutMillis) {
-   const std::chrono::steady_clock::time_point began = std::chrono::steady_clock::now();
-   while (millisSince(began) < timeoutMillis) {
-      pollfd p;
-      p.fd = fd;
-      p.events = 0;
-      p.revents = 0;
-      if ((::poll(&p, 1, 50) > 0) && ((p.revents & (POLLERR | POLLHUP)) != 0)) {
-         return true;
-      }
-   }
-   return false;
-}
-
 // Answers the doomed request only after the client has gone, and first brings the
 // server's connection into the state in which a write fails with EPIPE (which is when
 // the kernel raises SIGPIPE for a send that does not suppress it).
@@ -1112,8 +1098,11 @@ bool waitForReset(int fd, int timeoutMillis) {
 // A write to a peer that has closed is not enough on its own: the first one is accepted
 // locally (and answered by a reset), and the one after the reset may report ECONNRESET
 // instead; only then does a write fail with EPIPE. So the handler waits for the client's
-// close to reach it, makes that first write itself, waits for the reset, and writes again
-// until one fails with EPIPE. Every wait is bounded and ends as soon as its event occurs.
+// close to reach it, makes that first write itself, and writes again until one fails with
+// EPIPE. The writes themselves are the observation: poll() cannot be used to wait for the
+// reset, because macOS reports POLLHUP already for the FIN (and POLLERR/POLLHUP not at all
+// when no event is requested), so neither tells the reset from the close. Every wait is
+// bounded and ends as soon as its event occurs.
 class DisconnectedClientHandler : public tonnerre::MessageHandler {
 public:
    DisconnectedClientHandler(const ServerObservation& observation, DisconnectEvidence& evidence) :
@@ -1152,18 +1141,25 @@ private:
 
       m_evidence.firstWriteAfterClose = static_cast<int>(::send(fd, "x", 1, RAW_WRITE_FLAGS));
 
-      m_evidence.resetSeen = waitForReset(fd, WAIT_MILLIS);
-      if (!m_evidence.resetSeen) {
-         return;
-      }
-
-      for (int attempt = 1; attempt <= 3; ++attempt) {
+      const std::chrono::steady_clock::time_point began = std::chrono::steady_clock::now();
+      int attempts = 0;
+      while (millisSince(began) < WAIT_MILLIS) {
          errno = 0;
          const ssize_t rc = ::send(fd, "x", 1, RAW_WRITE_FLAGS);
          const int error = errno;
-         m_evidence.writesUntilBroken = attempt;
-         if ((rc < 0) && (error == EPIPE)) {
+         m_evidence.writesUntilBroken = ++attempts;
+         if (rc >= 0) {
+            // accepted locally: the reset has not arrived yet
+            std::this_thread::sleep_for(std::chrono::milliseconds(2));
+         } else if (error == EPIPE) {
+            m_evidence.resetSeen = true;
             m_evidence.epipeEstablished = true;
+            return;
+         } else if (error == ECONNRESET) {
+            // the reset is being reported; ECONNRESET is not the state that raises SIGPIPE
+            m_evidence.resetSeen = true;
+         } else {
+            m_evidence.unexpectedError = error;
             return;
          }
       }
@@ -1271,13 +1267,13 @@ int runDisconnectedClientScenarioInChild(const ReceiveScenario& scenario) {
    writeFailureReported = logger->seen("writing response message to socket failed");
 
    printf("RESULT SIGPIPE was %s, now SIG_DFL; client send=%s after %lld ms; server: handler=%s clientEof=%s "
-          "firstWriteAfterClose=%d reset=%s writesUntilEPIPE=%d epipe=%s; response write failure reported=%s "
-          "socketConnectedAfterRun=%d runDone=%s\n",
+          "firstWriteAfterClose=%d reset=%s writesUntilEPIPE=%d epipe=%s unexpectedError=%d; "
+          "response write failure reported=%s socketConnectedAfterRun=%d runDone=%s\n",
           dispositionName(previous), received ? "true" : "false", elapsed,
           evidence.handlerEntered ? "entered" : "NOT entered", evidence.clientEofSeen ? "yes" : "no",
           evidence.firstWriteAfterClose.load(), evidence.resetSeen ? "yes" : "no",
           evidence.writesUntilBroken.load(), evidence.epipeEstablished ? "yes" : "no",
-          writeFailureReported ? "yes" : "no", observation.connectedAfterFirstRun.load(),
+          evidence.unexpectedError.load(), writeFailureReported ? "yes" : "no", observation.connectedAfterFirstRun.load(),
           firstRunDone ? "yes" : "no");
 
    if (result == EXIT_MET) {
