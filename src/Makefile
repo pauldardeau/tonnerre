@@ -5,6 +5,7 @@ CC = c++
 CC_OPTS = -c -std=c++20 -Wall -fPIC -O2 -I../chaudiere/src
 
 LIB_NAME = tonnerre.so
+CHAUDIERE_LIB = ../chaudiere/src/libchaudiere.so
 
 OBJS =  Message.o \
 MessageRequestHandler.o \
@@ -19,7 +20,7 @@ clean :
 	rm -f $(LIB_NAME)
 
 $(LIB_NAME) : $(OBJS)
-	$(CC) -shared -fPIC $(OBJS) -o $(LIB_NAME)
+	$(CC) -shared -fPIC $(OBJS) $(CHAUDIERE_LIB) -o $(LIB_NAME)
 
 %.o : %.cpp
 	$(CC) $(CC_OPTS) $< -o $@
