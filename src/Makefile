@@ -9,6 +9,18 @@ UNAME_S := $(shell uname -s)
 LIB_NAME = tonnerre.so
 CHAUDIERE_LIB = ../chaudiere/src/libchaudiere.so
 
+# What the link rule below uses for Chaudiere on every platform except Darwin (which has its own branch): the library by pathname.
+SO_LINK_LIBS = $(CHAUDIERE_LIB)
+
+ifeq ($(UNAME_S),Linux)
+# An ELF dependent records a library without a SONAME by the path it was linked from, and a name with a slash is looked up
+# relative to the current directory. So Chaudiere is linked with -L/-l (recorded as libchaudiere.so), tonnerre.so is given the
+# SONAME tonnerre.so (so that its dependents record that bare name), and a RUNPATH relative to the library itself ($$ORIGIN,
+# which make turns into $ORIGIN, inside single quotes for the shell) lets the loader find Chaudiere wherever tonnerre.so
+# is loaded from. libchaudiere.so itself is not changed.
+SO_LINK_LIBS = -L../chaudiere/src -lchaudiere -Wl,-soname,$(LIB_NAME) -Wl,-rpath,'$$ORIGIN/../chaudiere/src'
+endif
+
 ifeq ($(UNAME_S),Darwin)
 # A Mach-O dependent records the install name of a library, not the path it was linked from, and dyld
 # finds a bare name only in the current directory and the default library directories. So tonnerre.so is
@@ -47,7 +59,7 @@ ifeq ($(UNAME_S),Darwin)
 	$(CC) -shared -fPIC $(OBJS) $(CHAUDIERE_LIB) $(SO_LINK_OPTS) -o $(LIB_NAME)
 	$(call RECORD_RPATH_NAME,$(CHAUDIERE_LIB),$(LIB_NAME))
 else
-	$(CC) -shared -fPIC $(OBJS) $(CHAUDIERE_LIB) -o $(LIB_NAME)
+	$(CC) -shared -fPIC $(OBJS) $(SO_LINK_LIBS) -o $(LIB_NAME)
 endif
 
 %.o : %.cpp

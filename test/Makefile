@@ -14,6 +14,15 @@ LIB_NAMES = ../src/tonnerre.so ../chaudiere/src/libchaudiere.so
 UT_LIBS = $(LIB_NAMES)
 STD_LINK_LIBS = -lpthread -ldl
 
+ifeq ($(UNAME_S),Linux)
+# An ELF dependent records a library without a SONAME by the path it was linked from, and a name with a slash is looked up
+# relative to the current directory (see src/Makefile). tonnerre.so has the SONAME tonnerre.so, so linking it by pathname
+# records the bare name; Chaudiere is linked with -L/-l and is recorded as libchaudiere.so; and a RUNPATH relative to the
+# executable ($$ORIGIN, which make turns into $ORIGIN, inside single quotes for the shell) lets the loader find both
+# libraries whatever the current directory, and when the tree is moved as a whole.
+LIB_NAMES = ../src/tonnerre.so -L../chaudiere/src -lchaudiere -Wl,-rpath,'$$ORIGIN/../src:$$ORIGIN/../chaudiere/src'
+endif
+
 ifeq ($(UNAME_S),Darwin)
 # A Mach-O dependent records the install name of a library, not the path it was linked from (see src/Makefile).
 # tonnerre.so carries the install name @rpath/tonnerre.so; the name libchaudiere.so carries is replaced, in each
